@@ -28,12 +28,11 @@ GMFIPRO = (Path.cwd().parent.parent / "apps" / "projects" / "__init__.py").exist
 # Celery Configuration
 CELERY_BROKER_URL = "redis://redis:6379/8"
 CELERY_RESULT_BACKEND = "django-db"
-CELERY_TASK_TIME_LIMIT = 300
+CELERY_TASK_TIME_LIMIT = 32
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 32
 CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True
 CELERY_RESULT_EXTENDED = True
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
-
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-1rs%sf5v3hlkq+tq1ci#rc41x_wl&q)7n!#+ki8+cltvcete*w"
@@ -46,7 +45,13 @@ ALLOWED_HOSTS: list = []
 # Application definition
 
 INSTALLED_APPS = [
-    "unfold",
+    "unfold",  # before django.contrib.admin
+    "unfold.contrib.filters",  # optional, if special filters are needed
+    "unfold.contrib.forms",  # optional, if special form elements are needed
+    "unfold.contrib.inlines",  # optional, if special inlines are needed
+    "unfold.contrib.import_export",  # optional, if django-import-export package is used
+    "unfold.contrib.guardian",  # optional, if django-guardian package is used
+    "unfold.contrib.simple_history",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -62,9 +67,11 @@ INSTALLED_APPS = [
     "globals",
     "invoices",
     "notifications",
+    "deposits",
+    "withdrawals",
 ]
 if GMFIPRO:
-    INSTALLED_APPS += ["projects", "deposits", "withdrawals"]
+    INSTALLED_APPS += ["projects"]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -98,7 +105,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "GMFi.wsgi.application"
-
 
 REST_FRAMEWORK = {"DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"]}
 
@@ -153,7 +159,6 @@ MEDIA_URL = "/media/"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
 
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
@@ -258,11 +263,27 @@ UNFOLD = {
                 ],
             },
             {
-                "title": _("通知"),
+                "title": _("充提币"),
                 "separator": True,
                 "items": [
                     {
-                        "title": _("通知"),
+                        "title": _("充币"),
+                        "icon": "download",
+                        "link": reverse_lazy("admin:deposits_deposit_changelist"),
+                    },
+                    {
+                        "title": _("提币"),
+                        "icon": "upload",
+                        "link": reverse_lazy("admin:withdrawals_withdrawal_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": _("回调通知"),
+                "separator": True,
+                "items": [
+                    {
+                        "title": _("回调通知"),
                         "icon": "notifications_active",
                         "link": reverse_lazy("admin:notifications_notification_changelist"),
                     },
@@ -271,23 +292,3 @@ UNFOLD = {
         ],
     },
 }
-
-if GMFIPRO:
-    UNFOLD["SIDEBAR"]["navigation"].append(  # type: ignore
-        {
-            "title": _("充提币"),
-            "separator": True,
-            "items": [
-                {
-                    "title": _("充币"),
-                    "icon": "download",
-                    "link": reverse_lazy("admin:deposits_deposit_changelist"),
-                },
-                {
-                    "title": _("提币"),
-                    "icon": "upload",
-                    "link": reverse_lazy("admin:withdrawals_withdrawal_changelist"),
-                },
-            ],
-        }
-    )

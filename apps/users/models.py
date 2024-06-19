@@ -37,5 +37,5 @@ class User(models.Model):
 
     class Meta:
         unique_together = ("username", "proj")
-        verbose_name = "用户"
-        verbose_name_plural = "用户"
+        verbose_name = _("用户")
+        verbose_name_plural = verbose_name

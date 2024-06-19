@@ -83,20 +83,20 @@ class Network(models.Model):
 
     def is_transaction_should_be_processed(self, tx: dict) -> bool:
         if (
-            tx["input"].startswith("0xa9059cbb")
-            and TokenAddress.objects.filter(network=self, address=tx["to"]).exists()
+                tx["input"].startswith("0xa9059cbb")
+                and TokenAddress.objects.filter(network=self, address=tx["to"]).exists()
         ):  # 平台所支持的 ERC20 代币的转账 (transfer)
             return True
 
         if Invoice.objects.filter(
-            pay_address=tx["to"], platform_tx__transaction__isnull=True
+                pay_address=tx["to"], platform_tx__transaction__isnull=True
         ).exists():  # 转入 ETH 到平台内的账单地址，且账单合约未失效
             return True
 
-        if Account.objects.filter(address=tx["from"]).exists():  #  平台内部账户发起的交易
+        if Account.objects.filter(address=tx["from"]).exists():  # 平台内部账户发起的交易
             return True
 
-        if Account.objects.filter(address=tx["to"]).exists():  #  转入 ETH 到平台内部账户
+        if Account.objects.filter(address=tx["to"]).exists():  # 转入 ETH 到平台内部账户
             return True
 
         return False
@@ -325,7 +325,7 @@ class Transaction(models.Model):
             _type = Transaction.Type.InvoiceGathering
 
         elif Project.objects.filter(
-            distribution_account__address=token_transfer.from_address
+                distribution_account__address=token_transfer.from_address
         ).exists():  # 项目的代币分发地址往外转币的话只有两种可能 1、Gas 分发 2、提币
             if Account.objects.filter(address=token_transfer.to_address).exists():
                 _type = Transaction.Type.GasRecharging
@@ -334,26 +334,26 @@ class Transaction(models.Model):
                 _type = Transaction.Type.Withdrawal
 
         elif Account.objects.filter(
-            address=token_transfer.to_address, user__isnull=False
+                address=token_transfer.to_address, user__isnull=False
         ).exists():  # 排除 gas 充值的情况下，向平台内部绑定了用户的账户转币，代表充值
             _type = Transaction.Type.Depositing
 
         elif Account.objects.filter(
-            address=token_transfer.from_address, user__isnull=False
+                address=token_transfer.from_address, user__isnull=False
         ).exists():  # 绑定用户的平台内部地址向外转账，代表归集充值的代币
             _type = Transaction.Type.DepositGathering
 
         elif Project.objects.filter(
-            distribution_account__address=token_transfer.to_address
+                distribution_account__address=token_transfer.to_address
         ).exists():  # 金库账户接收代币，代表注入资金到金库
             _type = Transaction.Type.Funding
             Account.objects.get(address=token_transfer.to_address).clear_tx_callable_failed_times()
 
         elif Invoice.objects.filter(
-            pay_address=token_transfer.to_address,
-            token=token_transfer.token,
-            network=self.block.network,
-            platform_tx__transaction__isnull=True,  # 账单如果已经归集了，那任何支付都是无效的
+                pay_address=token_transfer.to_address,
+                token=token_transfer.token,
+                network=self.block.network,
+                platform_tx__transaction__isnull=True,  # 账单如果已经归集了，那任何支付都是无效的
         ).exists():  # 如果接收代币的是账单地址，代表支付账单的行为
             _type = Transaction.Type.Paying
 
@@ -558,7 +558,7 @@ class Account(models.Model):
             ],
         )
 
-        return "0xa9059cbb" + encoded_params.hex()
+        return "0xa9059cbb" + encoded_params.hex()  # type: ignore
 
     def send_token(self, network: Network, token: Token, to: ChecksumAddress, value: int):
         if network.currency == token:
@@ -641,7 +641,7 @@ class PlatformTransaction(models.Model):
         transaction_dict = self.generate_transaction_dict()
 
         if (
-            PlatformTransaction.objects.filter(account=self.account, hash__isnull=True).exclude(pk=self.pk).exists()
+                PlatformTransaction.objects.filter(account=self.account, hash__isnull=True).exclude(pk=self.pk).exists()
         ):  # 如果本账户还有更早的交易未发送，那本次交易也不会发送
             return False
 

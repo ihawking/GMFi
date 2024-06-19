@@ -12,7 +12,7 @@ class Token(models.Model):
     decimals = models.PositiveSmallIntegerField(_("精度"), default=18)
     networks = models.ManyToManyField("chains.Network", through="tokens.TokenAddress", related_name="tokens")
     valid = models.BooleanField(_("启用"), default=True)
-    price_in_usdt = models.DecimalField(_("价格（USDT）"), blank=True, null=True, decimal_places=8, max_digits=32)
+    price_in_usdt = models.DecimalField(_("价格（USD）"), blank=True, null=True, decimal_places=8, max_digits=32)
 
     def support_this_network(self, network) -> bool:
         if network.currency == self:

@@ -30,11 +30,11 @@ class WithdrawalViewSet(viewsets.ModelViewSet):
         account.get_lock()
         with db_tx.atomic():
             platform_tx = account.send_token(
-                network=network, token=token, to=validated_data["to"], value=value * 10**token.decimals
+                network=network, token=token, to=validated_data["to"], value=value * 10 ** token.decimals
             )
             Withdrawal.objects.create(
                 no=validated_data["no"], user=user, value=value, token=token, platform_tx=platform_tx
             )
         account.release_lock()
 
-        return HttpResponse("success")
+        return HttpResponse("ok")

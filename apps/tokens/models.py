@@ -58,6 +58,10 @@ class TokenTransfer(models.Model):
     to_address = ChecksumAddressField(_("To"))
     value = models.DecimalField(max_digits=36, decimal_places=0, default=0)
 
+    class Meta:
+        verbose_name = _("转移")
+        verbose_name_plural = _("转移")
+
 
 class UserTokenValue(models.Model):
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, verbose_name=_("用户"))
@@ -80,3 +84,5 @@ class AccountTokenBalance(models.Model):
             "network",
             "token",
         )
+        verbose_name = _("余额")
+        verbose_name_plural = _("余额")

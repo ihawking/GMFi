@@ -30,8 +30,6 @@ from tokens.models import Token, TokenAddress, AccountTokenBalance, TokenTransfe
 
 
 # Create your models here.
-
-
 class Network(models.Model):
     name = models.CharField(_("名称"), max_length=32, unique=True)
     currency_name = models.CharField(_("主币名"), max_length=64, unique=True, help_text=_("如：ETH、BNB、MATIC 等；"))
@@ -674,5 +672,5 @@ class PlatformTransaction(models.Model):
 
         ordering = ("created_at",)
 
-        verbose_name = _("内部账户交易队列")
-        verbose_name_plural = _("内部账户交易队列")
+        verbose_name = _("发送交易")
+        verbose_name_plural = _("发送交易")

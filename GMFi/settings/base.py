@@ -279,11 +279,11 @@ UNFOLD = {
                 ],
             },
             {
-                "title": _("回调通知"),
+                "title": _("通知"),
                 "separator": True,
                 "items": [
                     {
-                        "title": _("回调通知"),
+                        "title": _("通知"),
                         "icon": "notifications_active",
                         "link": reverse_lazy("admin:notifications_notification_changelist"),
                     },

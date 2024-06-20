@@ -1,8 +1,8 @@
 import json
 import time
+import eth_abi
 from typing import cast
 
-import eth_abi
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.db import models
@@ -12,6 +12,7 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
 from web3 import AsyncWeb3
 from web3 import Web3
 from web3.auto import w3 as auto_w3
@@ -174,8 +175,8 @@ class Network(models.Model):
         return no_need
 
     class Meta:
-        verbose_name = _("主网")
-        verbose_name_plural = _("主网")
+        verbose_name = _("网络")
+        verbose_name_plural = _("网络")
 
 
 @receiver(post_save, sender=Network)
@@ -209,6 +210,9 @@ class Block(models.Model):
         return min(((self.network.max_block_number - self.number) / self.network.block_confirmations_count), 1)
 
     def confirm(self) -> bool:
+        if self.confirmed:
+            return True
+
         if self.network.is_block_confirmed(block_number=self.number, block_hash=self.hash):
             self.confirmed = True
             self.save()
@@ -586,7 +590,7 @@ class Account(models.Model):
 
 
 class PlatformTransaction(models.Model):
-    network = models.ForeignKey("chains.Network", on_delete=models.CASCADE, verbose_name=_("主网"))
+    network = models.ForeignKey("chains.Network", on_delete=models.CASCADE, verbose_name=_("网络"))
 
     account = models.ForeignKey("chains.Account", on_delete=models.CASCADE, verbose_name=_("账户"))
     nonce = models.PositiveIntegerField(_("Nonce"))

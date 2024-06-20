@@ -34,8 +34,8 @@ def predict_address(salt: HexStr, init_code: HexStr) -> HexStr:
 
 
 def get_transaction_data(
-    salt: HexStr,
-    init_code: HexStr,
+        salt: HexStr,
+        init_code: HexStr,
 ):
     encoded_params = eth_abi.encode(
         ["bytes", "uint256"],
@@ -50,11 +50,11 @@ def get_transaction_data(
 
 
 def create2(
-    salt: HexStr,
-    init_code: HexStr,
-    private_key: HexStr,
-    w3: Web3,
-    gas=1280_000,
+        salt: HexStr,
+        init_code: HexStr,
+        private_key: HexStr,
+        w3: Web3,
+        gas=1280_000,
 ):
     if is_poa(w3):
         w3.middleware_onion.inject(geth_poa_middleware, layer=0)

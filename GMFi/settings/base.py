@@ -66,9 +66,9 @@ INSTALLED_APPS = [
     "tokens",
     "globals",
     "invoices",
-    "notifications",
     "deposits",
     "withdrawals",
+    "notifications",
 ]
 if GMFIPRO:
     INSTALLED_APPS += ["projects"]
@@ -204,7 +204,7 @@ UNFOLD = {
                 "separator": True,
                 "items": [
                     {
-                        "title": _("主网"),
+                        "title": _("网络"),
                         "icon": "lan",
                         "link": reverse_lazy("admin:chains_network_changelist"),
                     },

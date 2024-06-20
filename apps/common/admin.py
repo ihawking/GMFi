@@ -1,7 +1,6 @@
 import json
 import random
 
-# from django.contrib.admin import ModelAdmin
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import RedirectView

@@ -44,7 +44,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
         token = Token.objects.get(symbol=validated_data["token"])
         network = Network.objects.get(name=validated_data["network"])
-        proj = Project.objects.get(appid=validated_data["appid"])
+        proj = Project.objects.first()
 
         with db_transaction.atomic():
             salt = os.urandom(32).hex()

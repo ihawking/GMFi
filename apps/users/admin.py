@@ -3,15 +3,15 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
 from common.admin import ReadOnlyModelAdmin, ModelAdmin
-from users.models import User, Manager
+from users.models import Player, Manager
 
 
 # Register your models here.
 
 
-@admin.register(User)
-class UserAdmin(ReadOnlyModelAdmin):
-    list_display = ("username",)
+@admin.register(Player)
+class PlayerAdmin(ReadOnlyModelAdmin):
+    list_display = ("uid",)
 
 
 @admin.register(Manager)

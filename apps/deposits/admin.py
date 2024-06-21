@@ -9,4 +9,4 @@ from deposits.models import Deposit
 
 @admin.register(Deposit)
 class DepositAdmin(ReadOnlyModelAdmin):
-    list_display = ("user", "token", "value")
+    list_display = ("player", "token", "value")

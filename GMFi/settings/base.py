@@ -23,7 +23,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 sys.path.insert(0, os.path.join(BASE_DIR, "apps"))
 AUTH_USER_MODEL = "users.Manager"
-GMFIPRO = (Path.cwd().parent.parent / "apps" / "projects" / "__init__.py").exists()
 
 # Celery Configuration
 CELERY_BROKER_URL = "redis://redis:6379/8"
@@ -70,8 +69,6 @@ INSTALLED_APPS = [
     "withdrawals",
     "notifications",
 ]
-if GMFIPRO:
-    INSTALLED_APPS += ["projects"]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -185,6 +182,11 @@ UNFOLD = {
                         "title": _("管理员"),
                         "icon": "manage_accounts",
                         "link": reverse_lazy("admin:users_manager_changelist"),
+                    },
+                    {
+                        "title": _("玩家"),
+                        "icon": "face",
+                        "link": reverse_lazy("admin:users_player_changelist"),
                     },
                     {
                         "title": _("项目配置"),

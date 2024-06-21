@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from chains.models import Network
 from globals.models import Project
 from tokens.models import Token
-from users.models import User
+from users.models import Player
 from withdrawals.models import Withdrawal
 from withdrawals.serializers import CreateWithdrawalSerializer
 
@@ -20,7 +20,7 @@ class WithdrawalViewSet(viewsets.ModelViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         validated_data = serializer.validated_data
 
-        user, _ = User.objects.get_or_create(username=validated_data["username"])
+        player, _ = Player.objects.get_or_create(uid=validated_data["uid"])
         network = Network.objects.get(name=validated_data["network"])
         token = Token.objects.get(symbol=validated_data["symbol"])
 
@@ -33,7 +33,7 @@ class WithdrawalViewSet(viewsets.ModelViewSet):
                 network=network, token=token, to=validated_data["to"], value=value * 10 ** token.decimals
             )
             Withdrawal.objects.create(
-                no=validated_data["no"], user=user, value=value, token=token, platform_tx=platform_tx
+                no=validated_data["no"], player=player, value=value, token=token, platform_tx=platform_tx
             )
         account.release_lock()
 

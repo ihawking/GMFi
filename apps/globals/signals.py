@@ -13,7 +13,6 @@ def create_global_project(sender, **kwargs):
         with db_transaction.atomic():
             Project.objects.create(
                 id=1,
-                appid=f"GP{generate_random_code(length=16)}",
                 distribution_account=Account.generate(),
                 hmac_key=generate_random_code(length=32),
             )

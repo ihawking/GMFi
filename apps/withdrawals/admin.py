@@ -10,7 +10,7 @@ from withdrawals.models import Withdrawal
 @admin.register(Withdrawal)
 class WithdrawalAdmin(ReadOnlyModelAdmin):
     list_display = (
-        "user",
+        "player",
         "token",
         "value",
         "no",

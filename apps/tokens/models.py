@@ -63,8 +63,8 @@ class TokenTransfer(models.Model):
         verbose_name_plural = _("转移")
 
 
-class UserTokenValue(models.Model):
-    user = models.ForeignKey("users.User", on_delete=models.CASCADE, verbose_name=_("用户"))
+class PlayerTokenValue(models.Model):
+    player = models.ForeignKey("users.Player", on_delete=models.CASCADE, verbose_name=_("用户"))
     token = models.ForeignKey("tokens.Token", on_delete=models.CASCADE, verbose_name=_("代币"))
     value = models.DecimalField(_("数量"), max_digits=32, decimal_places=8)
 

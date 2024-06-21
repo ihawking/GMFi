@@ -1,10 +1,10 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from tokens.models import UserTokenValue
+from tokens.models import PlayerTokenValue
 
 
-class Withdrawal(UserTokenValue):
+class Withdrawal(PlayerTokenValue):
     no = models.CharField(_("账单号"), max_length=64, unique=True)
     platform_tx = models.OneToOneField("chains.PlatformTransaction", on_delete=models.CASCADE, verbose_name=_("交易队列"))
 
@@ -17,7 +17,7 @@ class Withdrawal(UserTokenValue):
             "action": "withdrawal",
             "data": {
                 "no": self.no,
-                "username": self.user.username,
+                "uid": self.player.uid,
                 "symbol": self.token.symbol,
                 "value": self.value,
             },

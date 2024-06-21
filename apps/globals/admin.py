@@ -9,9 +9,9 @@ from common.admin import ModelAdmin
 from globals.models import Project
 
 admin.site.unregister(TaskResult)
+
+
 # Register your models here.
-
-
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
@@ -41,20 +41,18 @@ class ProjectForm(forms.ModelForm):
 @admin.register(Project)
 class ProjectAdmin(ModelAdmin):
     list_display = (
-        "appid",
         "distribution_account",
         "collection_address",
         "webhook",
     )
     readonly_fields = (
-        "appid",
         "distribution_account",
     )
     form = ProjectForm
     fieldsets = (
         (
             "系统",
-            {"fields": ("appid", "webhook", "notification_failed_times")},
+            {"fields": ("webhook", "notification_failed_times")},
         ),
         ("资金", {"fields": ("distribution_account", "collection_address")}),
         ("安全", {"fields": ("ip_white_list", "hmac_key")}),
@@ -65,17 +63,6 @@ class ProjectAdmin(ModelAdmin):
 
     def has_add_permission(self, request):
         return False  # 禁止添加
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-
-        if request.user.is_superuser:
-            return qs
-        else:
-            if settings.GMFIPRO:
-                return qs.filter(out_proj__user=request.user)
-            else:
-                return qs.none()
 
 
 @admin.register(TaskResult)

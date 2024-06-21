@@ -11,13 +11,11 @@ class SingletonModel(models.Model):
         abstract = True
 
     def save(self, *args, **kwargs):
-        if not settings.GMFIPRO:
-            assert self.pk == 1
+        assert self.pk == 1
         super().save(*args, **kwargs)
 
 
 class Project(SingletonModel):
-    appid = models.CharField(_("appid"), max_length=32, unique=True)
     ip_white_list = models.TextField(
         _("IP白名单"),
         null=True,
@@ -33,7 +31,7 @@ class Project(SingletonModel):
     distribution_account = models.OneToOneField(
         "chains.Account",
         on_delete=models.PROTECT,
-        verbose_name=_("金库账户"),
+        verbose_name=_("分发账户"),
         help_text="提币时，系统通过此账户发送代币到用户地址；<br/>要保证此地址的 Gas 和各代币充盈，否则提币无法成功；",
         related_name="proj",
     )
@@ -56,21 +54,13 @@ class Project(SingletonModel):
 
 
 def status(request):
-    if not settings.GMFIPRO:
-        proj = Project.objects.get(pk=1)
-    else:
-        if not request.user.is_superuser:
-            from projects.models import OutProject
-
-            proj = OutProject.objects.get(owner=request.user).project
-        else:
-            return ""
+    proj = Project.objects.first()
 
     if not all([proj.collection_address, proj.webhook]):
         return "待设置"
 
     elif proj.distribution_account.tx_callable_failed_times >= 32:
-        return "金库余额不足"
+        return "分发账户余额不足"
 
     elif proj.notification_failed_times > 32:
         return "通知接口异常"

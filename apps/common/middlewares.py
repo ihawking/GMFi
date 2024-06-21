@@ -14,26 +14,18 @@ class GMFiMiddleware:
 
     @staticmethod
     def get_proj(request):
-        try:
-            proj = Project.objects.get(appid=request.META.get("HTTP_APPID"))
-        except Project.DoesNotExist:
-            return JsonResponse({"code": 1000, "msg": _("Appid 不存在")}, status=400)
-
-        return proj
+        return Project.objects.first()
 
 
 class CheckHeadersMiddleware(GMFiMiddleware):
     def __call__(self, request):
         if "/api/" in request.path and request.method == "POST":
-            if "HTTP_APPID" not in request.META:
-                return JsonResponse({"code": 1004, "msg": _("Headers 缺失AppID")}, status=400)
             if "HTTP_TIMESTAMP" not in request.META:
-                return JsonResponse({"code": 1005, "msg": _("Headers 缺失Timestamp")}, status=400)
+                return JsonResponse({"code": 40005, "msg": _("Headers 缺失Timestamp")}, status=400)
             if "HTTP_SIGNATURE" not in request.META:
-                return JsonResponse({"code": 1006, "msg": _("Headers 缺失Signature")}, status=400)
+                return JsonResponse({"code": 40006, "msg": _("Headers 缺失Signature")}, status=400)
 
             post_data = request.POST.copy()
-            post_data["appid"] = request.META.get("HTTP_APPID", "")
             request.POST = post_data
 
         response = self.get_response(request)
@@ -53,7 +45,7 @@ class IPWhiteListMiddleware(GMFiMiddleware):
                 client_ip = request.META.get("REMOTE_ADDR")
 
             if not is_ip_in_whitelist(whitelist=proj.ip_white_list, ip=client_ip):
-                return JsonResponse({"code": 1001, "msg": _("IP 禁止")}, status=403)
+                return JsonResponse({"code": 40001, "msg": _("IP 禁止")}, status=403)
 
         response = self.get_response(request)
         return response
@@ -65,15 +57,15 @@ class HMACMiddleware(GMFiMiddleware):
             proj = self.get_proj(request)
 
             if (
-                not validate_hmac(
-                    message_dict=request.POST, key=proj.hmac_key, received_hmac=request.META.get("HTTP_SIGNATURE")
-                )
-                and False
+                    not validate_hmac(
+                        message_dict=request.POST, key=proj.hmac_key, received_hmac=request.META.get("HTTP_SIGNATURE")
+                    )
+                    and False
             ):
-                return JsonResponse({"code": 1002, "msg": _("签名验证失败")}, status=403)
+                return JsonResponse({"code": 40002, "msg": _("签名验证失败")}, status=403)
 
             if time.time() > int(request.META.get("HTTP_TIMESTAMP")) / 1000 + 300:
-                return JsonResponse({"code": 1003, "msg": _("时间戳超时")}, status=403)
+                return JsonResponse({"code": 40003, "msg": _("时间戳超时")}, status=403)
 
         response = self.get_response(request)
         return response

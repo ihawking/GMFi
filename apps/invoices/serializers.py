@@ -9,7 +9,6 @@ from tokens.models import Token
 
 
 class InvoiceCreateSerializer(Serializer):
-    appid = serializers.CharField()
     timestamp = serializers.IntegerField()
     out_no = serializers.CharField(required=True)
     subject = serializers.CharField(max_length=64)
@@ -43,7 +42,7 @@ class InvoiceCreateSerializer(Serializer):
         if attrs["duration"] < 10 or attrs["duration"] > 2 * 60:
             raise serializers.ValidationError(_("支付时间需要介于10分钟-2小时."))
 
-        if Invoice.objects.filter(out_no=attrs["out_no"], proj__appid=attrs["appid"]).exists():
+        if Invoice.objects.filter(out_no=attrs["out_no"]).exists():
             raise serializers.ValidationError(_("商户订单号重复."))
 
         return attrs

@@ -6,14 +6,13 @@ from web3.auto import w3 as auto_w3
 from chains.models import Network, Account
 from chains.utils.contract import get_erc20_contract
 from tokens.models import Token, TokenAddress
-from users.models import User
+from users.models import Player
 from withdrawals.models import Withdrawal
 
 
 class CreateWithdrawalSerializer(Serializer):
-    appid = serializers.CharField(allow_blank=True, allow_null=True)
     no = serializers.CharField(required=True)
-    username = serializers.CharField(required=True)
+    uid = serializers.CharField(required=True)
     to = serializers.CharField(required=True)
     symbol = serializers.CharField(required=True)
     network = serializers.CharField(required=True)
@@ -59,10 +58,7 @@ class CreateWithdrawalSerializer(Serializer):
 
     @staticmethod
     def _is_balance_enough(attrs) -> bool:
-        if attrs["appid"]:
-            user, _ = User.objects.get_or_create(username=attrs["username"], proj__appid=attrs["appid"])
-        else:
-            user, _ = User.objects.get_or_create(username=attrs["username"])
+        player, _ = Player.objects.get_or_create(uid=attrs["uid"])
 
         network = Network.objects.get(name=attrs["network"])
         token = Token.objects.get(symbol=attrs["symbol"])
@@ -70,11 +66,11 @@ class CreateWithdrawalSerializer(Serializer):
         value_on_chain = attrs["value"] * 10**token.decimals
 
         if network.currency == token:
-            return network.get_balance(address=user.proj.distribution_address) >= value_on_chain
+            return network.get_balance(address=player.proj.distribution_address) >= value_on_chain
         else:
             network_token = TokenAddress.objects.get(network=network, token=token)
             erc20_contract = get_erc20_contract(address=network_token.address, w3=network.w3)
-            return erc20_contract.balanceOf(address=user.proj.distribution_address) >= value_on_chain
+            return erc20_contract.balanceOf(address=player.proj.distribution_address) >= value_on_chain
 
     def validate(self, attrs):
         if not self._is_network_token_supported(attrs):

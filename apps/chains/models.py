@@ -336,18 +336,18 @@ class Transaction(models.Model):
                 _type = Transaction.Type.Withdrawal
 
         elif Account.objects.filter(
-                address=token_transfer.to_address, user__isnull=False
+                address=token_transfer.to_address, player__isnull=False
         ).exists():  # 排除 gas 充值的情况下，向平台内部绑定了用户的账户转币，代表充值
             _type = Transaction.Type.Depositing
 
         elif Account.objects.filter(
-                address=token_transfer.from_address, user__isnull=False
+                address=token_transfer.from_address, player__isnull=False
         ).exists():  # 绑定用户的平台内部地址向外转账，代表归集充值的代币
             _type = Transaction.Type.DepositGathering
 
         elif Project.objects.filter(
                 distribution_account__address=token_transfer.to_address
-        ).exists():  # 金库账户接收代币，代表注入资金到金库
+        ).exists():  # 分发账户接收代币，代表注入资金到分发账户
             _type = Transaction.Type.Funding
             Account.objects.get(address=token_transfer.to_address).clear_tx_callable_failed_times()
 
@@ -426,9 +426,9 @@ class Transaction(models.Model):
         if self.type == Transaction.Type.Paying:
             proj = self.payment.invoice.proj
         elif self.type == Transaction.Type.Depositing:
-            proj = self.deposit.user.proj
+            proj = self.deposit.player.proj
         elif self.type == Transaction.Type.Withdrawal:
-            proj = self.withdrawal.user.proj
+            proj = self.withdrawal.player.proj
         else:
             return
 
@@ -500,10 +500,10 @@ class Account(models.Model):
 
     @property
     def type(self):
-        if hasattr(self, "user"):
+        if hasattr(self, "player"):
             return _("充币账户")
         else:
-            return _("金库账户")
+            return _("分发账户")
 
     def alter_balance(self, network, token, value: int):
         try:

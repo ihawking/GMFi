@@ -17,9 +17,8 @@ from common.fields import ChecksumAddressField
 
 
 class Invoice(models.Model):
-    proj = models.ForeignKey("globals.Project", on_delete=models.CASCADE)
-    no = models.CharField(_("系统订单号"), max_length=32, db_index=True)
-    out_no = models.CharField(_("商户订单号"), max_length=32, db_index=True)
+    no = models.CharField(_("系统订单号"), unique=True, max_length=32, db_index=True)
+    out_no = models.CharField(_("商户订单号"), unique=True, max_length=32, db_index=True)
     subject = models.CharField(_("标题"), max_length=32)
     detail = models.JSONField(_("详情"), default=dict)
     token = models.ForeignKey("tokens.Token", on_delete=models.CASCADE, verbose_name=_("代币"))
@@ -80,7 +79,7 @@ class Invoice(models.Model):
         return self.network.chain_id
 
     def gather(self):
-        account = self.proj.distribution_account
+        account = self.network.project.distribution_account
 
         account.get_lock()
         with db_transaction.atomic():
@@ -104,7 +103,6 @@ class Invoice(models.Model):
         return f"{self.no}"
 
     class Meta:
-        unique_together = ("proj", "out_no")
         ordering = ("-created_at",)
         verbose_name = _("账单")
         verbose_name_plural = _("账单")

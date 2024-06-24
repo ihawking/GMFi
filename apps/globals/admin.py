@@ -45,9 +45,7 @@ class ProjectAdmin(ModelAdmin):
         "collection_address",
         "webhook",
     )
-    readonly_fields = (
-        "distribution_account",
-    )
+    readonly_fields = ("distribution_account",)
     form = ProjectForm
     fieldsets = (
         (

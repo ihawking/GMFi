@@ -20,7 +20,7 @@ from django.urls import path, include
 
 apps_api = [
     path("invoices/", include("invoices.urls"), name="invoices"),
-    path("withdrawals/", include("withdrawals.urls"), name="withdrawals")
+    path("withdrawals/", include("withdrawals.urls"), name="withdrawals"),
 ]
 
 urlpatterns = [

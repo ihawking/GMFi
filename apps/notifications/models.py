@@ -1,6 +1,7 @@
 import requests  # type: ignore
 from django.db import models
 from django.utils import timezone
+from globals.models import Project
 
 from common.utils.crypto import create_hmac_sign
 
@@ -19,10 +20,10 @@ class Notification(models.Model):
     notified_at = models.DateTimeField(blank=True, null=True)
 
     def notify(self):
-        proj = self.transaction.related_proj
-        headers = {"GMFi-Signature": create_hmac_sign(message_dict=self.content, key=proj.hmac_key)}
+        project = Project.objects.get(pk=1)
+        headers = {"GMFi-Signature": create_hmac_sign(message_dict=self.content, key=project.hmac_key)}
 
-        resp = requests.post(proj.webhook, data=self.content, headers=headers, timeout=8)
+        resp = requests.post(project.webhook, data=self.content, headers=headers, timeout=8)
 
         if resp.status_code == 200 and resp.text == "success":
             self.notified = True

@@ -21,7 +21,7 @@ class Deposit(PlayerTokenValue):
             transaction=transaction,
             player=deposit_account.player,
             token=token_transfer.token,
-            value=token_transfer.value / 10 ** token_transfer.token.decimals,
+            value=token_transfer.value / 10**token_transfer.token.decimals,
         )
 
     @property

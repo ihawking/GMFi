@@ -33,7 +33,7 @@ class Project(SingletonModel):
         on_delete=models.PROTECT,
         verbose_name=_("分发账户"),
         help_text="提币时，系统通过此账户发送代币到用户地址；<br/>要保证此地址的 Gas 和各代币充盈，否则提币无法成功；",
-        related_name="proj",
+        related_name="project",
     )
     collection_address = ChecksumAddressField(
         null=True,
@@ -54,15 +54,15 @@ class Project(SingletonModel):
 
 
 def status(request):
-    proj = Project.objects.first()
+    project = Project.objects.get(pk=1)
 
-    if not all([proj.collection_address, proj.webhook]):
+    if not all([project.collection_address, project.webhook]):
         return "待设置"
 
-    elif proj.distribution_account.tx_callable_failed_times >= 32:
+    elif project.distribution_account.tx_callable_failed_times >= 32:
         return "分发账户余额不足"
 
-    elif proj.notification_failed_times > 32:
+    elif project.notification_failed_times > 32:
         return "通知接口异常"
 
     else:

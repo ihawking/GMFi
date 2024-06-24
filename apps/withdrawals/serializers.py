@@ -8,6 +8,7 @@ from chains.utils.contract import get_erc20_contract
 from tokens.models import Token, TokenAddress
 from users.models import Player
 from withdrawals.models import Withdrawal
+from globals.models import Project
 
 
 class CreateWithdrawalSerializer(Serializer):
@@ -58,6 +59,7 @@ class CreateWithdrawalSerializer(Serializer):
 
     @staticmethod
     def _is_balance_enough(attrs) -> bool:
+        project = Project.objects.get(pk=1)
         player, _ = Player.objects.get_or_create(uid=attrs["uid"])
 
         network = Network.objects.get(name=attrs["network"])
@@ -66,11 +68,11 @@ class CreateWithdrawalSerializer(Serializer):
         value_on_chain = attrs["value"] * 10**token.decimals
 
         if network.currency == token:
-            return network.get_balance(address=player.proj.distribution_address) >= value_on_chain
+            return network.get_balance(address=project.distribution_address) >= value_on_chain
         else:
             network_token = TokenAddress.objects.get(network=network, token=token)
             erc20_contract = get_erc20_contract(address=network_token.address, w3=network.w3)
-            return erc20_contract.balanceOf(address=player.proj.distribution_address) >= value_on_chain
+            return erc20_contract.balanceOf(address=project.distribution_address) >= value_on_chain
 
     def validate(self, attrs):
         if not self._is_network_token_supported(attrs):

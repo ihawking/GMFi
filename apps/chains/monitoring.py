@@ -8,7 +8,6 @@ if __name__ == "__main__":
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "GMFi.settings")
     django.setup()
 
-
 from chains.models import Network, Block
 from chains.tasks import filter_and_store_tx
 from web3.types import HexStr
@@ -113,6 +112,7 @@ async def monitor_the_network(network: Network):
 
                 for new_block_data in new_block_data_list:  # 此处需要保证必须按照从小到大的顺序插入区块
                     await store_block_with_txs(network, new_block_data)
+                await asyncio.sleep(1)
 
         except:
             await asyncio.sleep(1)

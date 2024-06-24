@@ -14,7 +14,7 @@ class GMFiMiddleware:
 
     @staticmethod
     def get_proj(request):
-        return Project.objects.first()
+        return Project.objects.get(pk=1)
 
 
 class CheckHeadersMiddleware(GMFiMiddleware):
@@ -35,7 +35,7 @@ class CheckHeadersMiddleware(GMFiMiddleware):
 class IPWhiteListMiddleware(GMFiMiddleware):
     def __call__(self, request):
         if "/api/" in request.path and request.method == "POST":
-            proj = self.get_proj(request)
+            project = self.get_proj(request)
 
             x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
 
@@ -44,7 +44,7 @@ class IPWhiteListMiddleware(GMFiMiddleware):
             else:
                 client_ip = request.META.get("REMOTE_ADDR")
 
-            if not is_ip_in_whitelist(whitelist=proj.ip_white_list, ip=client_ip):
+            if not is_ip_in_whitelist(whitelist=project.ip_white_list, ip=client_ip):
                 return JsonResponse({"code": 40001, "msg": _("IP 禁止")}, status=403)
 
         response = self.get_response(request)
@@ -54,13 +54,13 @@ class IPWhiteListMiddleware(GMFiMiddleware):
 class HMACMiddleware(GMFiMiddleware):
     def __call__(self, request):
         if "/api/" in request.path and request.method == "POST":
-            proj = self.get_proj(request)
+            project = self.get_proj(request)
 
             if (
-                    not validate_hmac(
-                        message_dict=request.POST, key=proj.hmac_key, received_hmac=request.META.get("HTTP_SIGNATURE")
-                    )
-                    and False
+                not validate_hmac(
+                    message_dict=request.POST, key=project.hmac_key, received_hmac=request.META.get("HTTP_SIGNATURE")
+                )
+                and False
             ):
                 return JsonResponse({"code": 40002, "msg": _("签名验证失败")}, status=403)
 

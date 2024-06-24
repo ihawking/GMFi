@@ -1178,13 +1178,13 @@ hiredis = ["redis[hiredis] (>=3,!=4.0.0,!=4.0.1)"]
 
 [[package]]
 name = "django-unfold"
-version = "0.28.1"
+version = "0.29.0"
 description = "Modern Django admin theme for seamless interface development"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "django_unfold-0.28.1-py3-none-any.whl", hash = "sha256:73a48b13e022ad8779b2e3fbf21dfed94c71228d841cc7af4bc32ff8f152ba74"},
-    {file = "django_unfold-0.28.1.tar.gz", hash = "sha256:502acc2d1f01aa6c1d1dba7cd2f1881121b002b7a66f4d27a573c65f22c4947e"},
+    {file = "django_unfold-0.29.0-py3-none-any.whl", hash = "sha256:3d634d018c0a142250581cd80a26a5f3ff072d0b5e7a17a282e3189fab0e6a0e"},
+    {file = "django_unfold-0.29.0.tar.gz", hash = "sha256:c3a8c7ea464360be4a703d4cf6a29aedd79d82e78674ec149ccb9b26aa5b17b0"},
 ]
 
 [package.dependencies]
@@ -3979,4 +3979,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "e5b951cb2f8a1e00f756cb292b188e5163dc0bd6adfc62f60645094e049070a4"
+content-hash = "e2fe020b9a6d33fa8ffc6d6ff41c367ba65d9495dff836a29738b319a35739ee"

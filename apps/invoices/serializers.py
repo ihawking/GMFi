@@ -9,7 +9,6 @@ from tokens.models import Token
 
 
 class InvoiceCreateSerializer(Serializer):
-    timestamp = serializers.IntegerField()
     out_no = serializers.CharField(required=True)
     subject = serializers.CharField(max_length=64)
     detail = serializers.JSONField(default=dict)

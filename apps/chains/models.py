@@ -450,8 +450,10 @@ class Transaction(models.Model):
             return
 
         if self.type == Transaction.Type.Paying:
-            if self.payment.invoice.paid:  # 本次支付账单支付完成，才会进行通知
+            if self.payment.invoice.paid:  # 本次支付账单支付进度完成，才会进行通知
                 content.update(self.payment.invoice.notification_content)
+            else:
+                return
         elif self.type == Transaction.Type.Depositing:
             content.update(self.deposit.notification_content)
         elif self.type == Transaction.Type.Withdrawal:
@@ -631,22 +633,20 @@ class PlatformTransaction(models.Model):
         """
         transaction_dict = self.generate_transaction_dict()
 
-        if (
-            PlatformTransaction.objects.filter(account=self.account, hash__isnull=True).exclude(pk=self.pk).exists()
-        ):  # 如果本账户还有更早的交易未发送，那本次交易也不会发送
+        # 如果本账户还有更早的交易未发送过，那本次交易也不会发送
+        if PlatformTransaction.objects.filter(account=self.account, hash__isnull=True, nonce__lt=self.nonce).exists():
             return False
 
         if self.is_transaction_callable(transaction_dict):
             signed_transaction = self.network.w3.eth.account.sign_transaction(
                 transaction_dict, self.account.private_key
             )
-            tx_hash = signed_transaction.hash.hex()
 
-            self.network.w3.eth.send_raw_transaction(signed_transaction.rawTransaction)
-
-            self.hash = tx_hash
+            self.hash = signed_transaction.hash.hex()
             self.transacted_at = timezone.now()
             self.save()
+
+            self.network.w3.eth.send_raw_transaction(signed_transaction.rawTransaction)
             return True
         else:
             self.account.tx_callable_failed_times += 1

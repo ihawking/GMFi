@@ -78,9 +78,9 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "common.middlewares.CheckHeadersMiddleware",
-    "common.middlewares.IPWhiteListMiddleware",
-    "common.middlewares.HMACMiddleware",
+    # "common.middlewares.CheckHeadersMiddleware",
+    # "common.middlewares.IPWhiteListMiddleware",
+    # "common.middlewares.HMACMiddleware",
 ]
 
 ROOT_URLCONF = "GMFi.urls"

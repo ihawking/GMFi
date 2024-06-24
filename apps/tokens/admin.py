@@ -10,7 +10,7 @@ from tokens.models import Token, TokenAddress, TokenTransfer, AccountTokenBalanc
 
 class TokenAddressInline(TabularInline):
     model = TokenAddress
-    extra = 1
+    extra = 0
 
 
 @admin.register(Token)

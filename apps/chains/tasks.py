@@ -1,16 +1,14 @@
-from datetime import timedelta
-
 from celery import shared_task
 from django.db.models import Q
-from django.utils import timezone
 
 from chains.models import Block, Transaction, PlatformTransaction
 from common.decorators import singleton_task
+from common.utils.time import ago
 
 
-@shared_task
+@shared_task(time_limit=64, soft_time_limit=32)
 def filter_and_store_tx(block_id, tx_metadata):
-    block = Block.objects.get(pk=block_id)
+    block = Block.objects.get(id=block_id)
     network = block.network
 
     if network.is_transaction_should_be_processed(tx_metadata):
@@ -24,19 +22,16 @@ def filter_and_store_tx(block_id, tx_metadata):
         )
 
 
-@shared_task
-@singleton_task(timeout=16)
+@shared_task(time_limit=64, soft_time_limit=32)
+@singleton_task(timeout=64)
 def transact_platform_transactions():
-    now = timezone.now()
-    seconds_ago_600 = now - timedelta(seconds=600)
-
     for platform_tx in PlatformTransaction.objects.filter(
-        Q(hash__isnull=True) | Q(hash__isnull=False, transaction__isnull=True, transacted_at__lt=seconds_ago_600)
+        Q(hash__isnull=True) | Q(transacted_at__lt=ago(seconds=600), transaction__isnull=True)
     ).filter(account__tx_callable_failed_times__lt=32)[:4]:
         platform_tx.transact()
 
 
-@shared_task
+@shared_task(time_limit=64, soft_time_limit=32)
 @singleton_task(timeout=32)
 def confirm_past_blocks(block_id):
     latest_block = Block.objects.get(pk=block_id)

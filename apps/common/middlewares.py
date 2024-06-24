@@ -17,21 +17,6 @@ class GMFiMiddleware:
         return Project.objects.get(pk=1)
 
 
-class CheckHeadersMiddleware(GMFiMiddleware):
-    def __call__(self, request):
-        if "/api/" in request.path and request.method == "POST":
-            if "HTTP_TIMESTAMP" not in request.META:
-                return JsonResponse({"code": 40005, "msg": _("Headers 缺失Timestamp")}, status=400)
-            if "HTTP_SIGNATURE" not in request.META:
-                return JsonResponse({"code": 40006, "msg": _("Headers 缺失Signature")}, status=400)
-
-            post_data = request.POST.copy()
-            request.POST = post_data
-
-        response = self.get_response(request)
-        return response
-
-
 class IPWhiteListMiddleware(GMFiMiddleware):
     def __call__(self, request):
         if "/api/" in request.path and request.method == "POST":
@@ -51,6 +36,21 @@ class IPWhiteListMiddleware(GMFiMiddleware):
         return response
 
 
+class CheckHeadersMiddleware(GMFiMiddleware):
+    def __call__(self, request):
+        if "/api/" in request.path and request.method == "POST":
+            if "HTTP_TIMESTAMP" not in request.META:
+                return JsonResponse({"code": 40002, "msg": _("Headers 缺失Timestamp")}, status=400)
+            if "HTTP_SIGNATURE" not in request.META:
+                return JsonResponse({"code": 40003, "msg": _("Headers 缺失Signature")}, status=400)
+
+            post_data = request.POST.copy()
+            request.POST = post_data
+
+        response = self.get_response(request)
+        return response
+
+
 class HMACMiddleware(GMFiMiddleware):
     def __call__(self, request):
         if "/api/" in request.path and request.method == "POST":
@@ -62,10 +62,13 @@ class HMACMiddleware(GMFiMiddleware):
                 )
                 and False
             ):
-                return JsonResponse({"code": 40002, "msg": _("签名验证失败")}, status=403)
+                return JsonResponse({"code": 40004, "msg": _("签名验证失败")}, status=403)
 
             if time.time() > int(request.META.get("HTTP_TIMESTAMP")) / 1000 + 300:
-                return JsonResponse({"code": 40003, "msg": _("时间戳超时")}, status=403)
+                return JsonResponse({"code": 40005, "msg": _("时间戳超时")}, status=403)
+
+            if time.time() < int(request.META.get("HTTP_TIMESTAMP")) / 1000:
+                return JsonResponse({"code": 40006, "msg": _("非法时间戳")}, status=403)
 
         response = self.get_response(request)
         return response

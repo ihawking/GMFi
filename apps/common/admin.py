@@ -17,6 +17,11 @@ def environment_callback(request):
     return [Block.objects.count(), "info"]
 
 
+class NoDeleteModelAdmin(ModelAdmin):
+    def has_delete_permission(self, request, obj=None):
+        return False  # 禁止删除
+
+
 class ReadOnlyModelAdmin(ModelAdmin):
     def has_change_permission(self, request, obj=None):
         return False  # 禁止编辑

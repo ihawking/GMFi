@@ -38,7 +38,7 @@ class CreateWithdrawalSerializer(Serializer):
 
     def validate_network(self, value):
         if not Network.objects.filter(name=value).exists():
-            raise serializers.ValidationError(_("网络未创建."))
+            raise serializers.ValidationError(_(f"网络 {value} 未创建."))
         return value
 
     @staticmethod
@@ -72,14 +72,14 @@ class CreateWithdrawalSerializer(Serializer):
         else:
             network_token = TokenAddress.objects.get(network=network, token=token)
             erc20_contract = get_erc20_contract(address=network_token.address, w3=network.w3)
-            return erc20_contract.balanceOf(address=project.distribution_address) >= value_on_chain
+            return erc20_contract.functions.balanceOf(project.distribution_address).call() >= value_on_chain
 
     def validate(self, attrs):
         if not self._is_network_token_supported(attrs):
             raise serializers.ValidationError(_("网络与代币不匹配."))
 
         if not self._is_balance_enough(attrs):
-            raise serializers.ValidationError(_("代币分发账户中的此代币余额不足."))
+            raise serializers.ValidationError(_("系统账户中的此代币余额不足."))
 
         if self._is_contract_address(attrs):
             raise serializers.ValidationError(_("收币地址不可以为合约地址."))

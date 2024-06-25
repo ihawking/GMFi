@@ -4,7 +4,7 @@ import eth_abi
 from typing import cast
 
 from django.core.cache import cache
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db import transaction as db_transaction
 from django.db.models import F, Sum
@@ -27,14 +27,17 @@ from common.utils.crypto import aes_cipher
 from globals.models import Project
 from invoices.models import Invoice, Payment
 from notifications.models import Notification
-from tokens.models import Token, TokenAddress, AccountTokenBalance, TokenTransfer
+from tokens.models import Token, TokenAddress, AccountTokenBalance, TokenTransfer, TokenType
 
 
 # Create your models here.
 class Network(models.Model):
+    chain_id = models.PositiveIntegerField(
+        _("Chain ID"), blank=True, help_text=_("根据RPC自动检测Chain ID，无需填写；"), primary_key=True
+    )
     name = models.CharField(_("名称"), max_length=32, unique=True)
-    currency_name = models.CharField(_("主币名"), max_length=64, unique=True, help_text=_("如：ETH、BNB、MATIC 等；"))
-    chain_id = models.PositiveIntegerField(_("Chain ID"), unique=True, blank=True, help_text=_("自动检测Chain ID，无需填写；"))
+    currency_symbol = models.CharField(_("主币名"), max_length=64, unique=True, help_text=_("如：ETH、BNB、MATIC 等；"))
+    currency = models.OneToOneField("tokens.Token", on_delete=models.PROTECT, editable=False, blank=True)
     is_poa = models.BooleanField(_("是否为 POA 网络"), blank=True, editable=False)
     endpoint_uri = models.CharField(_("HTTP RPC 节点地址"), max_length=256, unique=True)
 
@@ -46,17 +49,21 @@ class Network(models.Model):
             "<br/>数值参考：<br/>ETH: 12; BSC: 15; Others: 16；"
         ),
     )
+    active = models.BooleanField(default=True, verbose_name=_("启用"))
+
     created_at = models.DateTimeField(_("创建时间"), auto_now_add=True)
     updated_at = models.DateTimeField(_("更新时间"), auto_now=True)
 
     def __str__(self):
         return f"{self.name}"
 
-    @property
-    def currency(self) -> Token:
-        currency, _ = Token.objects.get_or_create(symbol=self.currency_name, decimals=18)
+    def delete(self, *args, **kwargs):
+        raise ValidationError(_("为保护数据完整性，禁止删除."))
 
-        return currency
+    # 如果你想确保批量删除也被阻止，可以覆盖 delete 方法
+    @classmethod
+    def delete_queryset(cls, queryset):
+        raise ValidationError(_("为保护数据完整性，禁止删除."))
 
     @property
     def gas_price(self) -> int:
@@ -190,16 +197,22 @@ def networks_changed(*args, **kwargs):
 
 @receiver(pre_save, sender=Network)
 def network_fill_up(sender, instance: Network, **kwargs):
-    if not Network.objects.filter(id=instance.id).exists():
+    if not Network.objects.filter(pk=instance.pk).exists():
         # 如果是新创建，则需要自动把以下字段补充完整
         instance.is_poa = instance.get_is_poa
         instance.chain_id = instance.w3.eth.chain_id
+        instance.currency = Token.objects.create(
+            pk=instance.chain_id, symbol=instance.currency_symbol, type=TokenType.Base
+        )
+
+    instance.currency.symbol = instance.currency_symbol
+    instance.currency.save()
 
 
 class Block(models.Model):
     hash = HexStr64Field()
     parent = models.OneToOneField("chains.Block", on_delete=models.CASCADE, blank=True, null=True)
-    network = models.ForeignKey(Network, on_delete=models.CASCADE)
+    network = models.ForeignKey("chains.Network", on_delete=models.PROTECT)
     number = models.PositiveIntegerField(db_index=True)
     timestamp = models.PositiveIntegerField()
 
@@ -246,7 +259,7 @@ def block_created(sender, instance, created, **kwargs):
     if created:
         from chains.tasks import confirm_past_blocks
 
-        confirm_past_blocks.delay(instance.id)
+        confirm_past_blocks.delay(instance.pk)
 
 
 class Transaction(models.Model):
@@ -349,7 +362,7 @@ class Transaction(models.Model):
 
         elif Project.objects.filter(
             distribution_account__address=token_transfer.to_address
-        ).exists():  # 分发账户接收代币，代表注入资金到分发账户
+        ).exists():  # 系统账户接收代币，代表注入资金到系统账户
             _type = Transaction.Type.Funding
             Account.objects.get(address=token_transfer.to_address).clear_tx_callable_failed_times()
 
@@ -494,14 +507,14 @@ class Account(models.Model):
         if hasattr(self, "player"):
             return _("充币账户")
         else:
-            return _("分发账户")
+            return _("系统账户")
 
     def alter_balance(self, network, token, value: int):
         try:
             balance = AccountTokenBalance.objects.select_for_update().get(account=self, network=network, token=token)
         except AccountTokenBalance.DoesNotExist:
             balance, _ = AccountTokenBalance.objects.get_or_create(account=self, network=network, token=token)
-            balance = AccountTokenBalance.objects.select_for_update().get(id=balance.id)
+            balance = AccountTokenBalance.objects.select_for_update().get(pk=balance.pk)
 
         balance.value = F("value") + value
         balance.save()
@@ -581,14 +594,14 @@ class Account(models.Model):
 
 
 class PlatformTransaction(models.Model):
-    network = models.ForeignKey("chains.Network", on_delete=models.CASCADE, verbose_name=_("网络"))
+    network = models.ForeignKey("chains.Network", on_delete=models.PROTECT, verbose_name=_("网络"))
 
-    account = models.ForeignKey("chains.Account", on_delete=models.CASCADE, verbose_name=_("账户"))
+    account = models.ForeignKey("chains.Account", on_delete=models.PROTECT, verbose_name=_("账户"))
     nonce = models.PositiveIntegerField(_("Nonce"))
     to = ChecksumAddressField(_("To"))
     value = models.DecimalField(_("Value"), max_digits=36, decimal_places=0, default=0)
     data = models.TextField(_("Data"), blank=True, null=True)
-    gas = models.PositiveIntegerField(_("Gas"))
+    gas = models.PositiveIntegerField(_("Gas"), default=160000)
 
     hash = HexStr64Field(blank=True, null=True)
     transaction = models.OneToOneField(
@@ -598,6 +611,12 @@ class PlatformTransaction(models.Model):
     transacted_at = models.DateTimeField(_("交易提交时间"), blank=True, null=True)
     created_at = models.DateTimeField(_("创建时间"), auto_now_add=True)
     updated_at = models.DateTimeField(_("更新时间"), auto_now=True)
+
+    def __str__(self):
+        if self.hash:
+            return self.hash
+        else:
+            return f"{self.network.name}-{self.account.address}-{self.nonce}"
 
     def generate_transaction_dict(self) -> dict:
         transaction = {

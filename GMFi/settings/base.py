@@ -258,7 +258,7 @@ UNFOLD = {
                         "link": reverse_lazy("admin:invoices_invoice_changelist"),
                     },
                     {
-                        "title": _("支付"),
+                        "title": _("支付记录"),
                         "icon": "payments",
                         "link": reverse_lazy("admin:invoices_payment_changelist"),
                     },

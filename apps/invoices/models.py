@@ -17,12 +17,12 @@ from common.fields import ChecksumAddressField
 
 
 class Invoice(models.Model):
-    no = models.CharField(_("系统订单号"), unique=True, max_length=32, db_index=True)
-    out_no = models.CharField(_("商户订单号"), unique=True, max_length=32, db_index=True)
+    no = models.CharField(_("系统账单号"), unique=True, max_length=32, db_index=True)
+    out_no = models.CharField(_("商户账单号"), unique=True, max_length=32, db_index=True)
     subject = models.CharField(_("标题"), max_length=32)
     detail = models.JSONField(_("详情"), default=dict)
-    token = models.ForeignKey("tokens.Token", on_delete=models.CASCADE, verbose_name=_("代币"))
-    network = models.ForeignKey("chains.Network", on_delete=models.CASCADE, verbose_name=_("网络"))
+    token = models.ForeignKey("tokens.Token", on_delete=models.PROTECT, verbose_name=_("代币"))
+    network = models.ForeignKey("chains.Network", on_delete=models.PROTECT, verbose_name=_("网络"))
     value = models.DecimalField(_("应付数量"), max_digits=32, decimal_places=8)
     expired_time = models.DateTimeField(_("支付截止时间"))
     redirect_url = models.URLField(_("支付成功后重定向地址"), null=True, blank=True)
@@ -36,7 +36,7 @@ class Invoice(models.Model):
     actual_value = models.DecimalField(_("实际支付数量"), max_digits=32, decimal_places=8, default=0)
 
     platform_tx = models.OneToOneField(
-        "chains.PlatformTransaction", on_delete=models.CASCADE, verbose_name=_("归集交易队列"), null=True, blank=True
+        "chains.PlatformTransaction", on_delete=models.PROTECT, verbose_name=_("归集交易"), null=True, blank=True
     )
 
     created_at = models.DateTimeField(_("创建时间"), auto_now_add=True)
@@ -85,7 +85,7 @@ class Invoice(models.Model):
         with db_transaction.atomic():
             from chains.models import PlatformTransaction
 
-            platform_tx = PlatformTransaction.objects.create(
+            self.platform_tx = PlatformTransaction.objects.create(
                 account=account,
                 network=self.network,
                 to=create2.factory_address,
@@ -95,7 +95,6 @@ class Invoice(models.Model):
                     salt=cast(HexStr, self.salt), init_code=cast(HexStr, self.init_code)
                 ),
             )
-            self.platform_tx = platform_tx
             self.save()
         account.release_lock()
 
@@ -127,8 +126,8 @@ class Payment(models.Model):
 
     class Meta:
         ordering = ("transaction",)
-        verbose_name = _("支付")
-        verbose_name_plural = _("支付")
+        verbose_name = _("支付记录")
+        verbose_name_plural = _("支付记录")
 
 
 @receiver(post_save, sender=Payment)

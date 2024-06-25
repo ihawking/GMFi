@@ -77,7 +77,7 @@ async def store_block_with_txs(network: Network, block_data: AttributeDict) -> B
 
     for tx in block_data["transactions"]:
         tx_metadata = json.loads(network.w3.to_json(tx))
-        filter_and_store_tx.delay(block_obj.id, tx_metadata)
+        filter_and_store_tx.delay(block_obj.pk, tx_metadata)
 
     print(f"{block_data['number']}  {block_data['hash'].hex()} ok")
 

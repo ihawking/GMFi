@@ -10,8 +10,21 @@ from withdrawals.models import Withdrawal
 @admin.register(Withdrawal)
 class WithdrawalAdmin(ReadOnlyModelAdmin):
     list_display = (
+        "no",
         "player",
+        "to",
+        "network",
         "token",
         "value",
-        "no",
     )
+
+    search_fields = (
+        "no",
+        "player__uid",
+    )
+    list_filter = ("token",)
+
+    def network(self, obj):
+        return obj.platform_tx.network.name
+
+    network.short_description = "网络"

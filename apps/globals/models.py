@@ -31,7 +31,7 @@ class Project(SingletonModel):
     distribution_account = models.OneToOneField(
         "chains.Account",
         on_delete=models.PROTECT,
-        verbose_name=_("分发账户"),
+        verbose_name=_("系统账户"),
         help_text="提币时，系统通过此账户发送代币到用户地址；<br/>要保证此地址的 Gas 和各代币充盈，否则提币无法成功；",
         related_name="project",
     )
@@ -60,7 +60,7 @@ def status(request):
         return "待设置"
 
     elif project.distribution_account.tx_callable_failed_times >= 32:
-        return "分发账户余额不足"
+        return "系统账户余额不足"
 
     elif project.notification_failed_times > 32:
         return "通知接口异常"

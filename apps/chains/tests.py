@@ -10,7 +10,7 @@ def network(db):
         chain_id=97,
         endpoint_uri="https://data-seed-prebsc-1-s1.binance.org:8545/",
         is_poa=True,
-        currency_name="TBNB",
+        currency_symbol="TBNB",
     )
     return network
 

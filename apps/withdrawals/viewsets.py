@@ -26,14 +26,20 @@ class WithdrawalViewSet(viewsets.ModelViewSet):
 
         value = validated_data["value"]
 
-        account = Project.distribution_account
+        account = network.project.distribution_account
         account.get_lock()
+
         with db_tx.atomic():
             platform_tx = account.send_token(
-                network=network, token=token, to=validated_data["to"], value=value * 10**token.decimals
+                network=network, token=token, to=validated_data["to"], value=int(value * 10**token.decimals)
             )
             Withdrawal.objects.create(
-                no=validated_data["no"], player=player, value=value, token=token, platform_tx=platform_tx
+                no=validated_data["no"],
+                to=validated_data["to"],
+                player=player,
+                value=value,
+                token=token,
+                platform_tx=platform_tx,
             )
         account.release_lock()
 

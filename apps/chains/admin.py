@@ -3,7 +3,7 @@ from django.contrib import admin
 from web3 import Web3
 
 from chains.models import Network, Account, PlatformTransaction, Block, Transaction
-from common.admin import ReadOnlyModelAdmin, ModelAdmin
+from common.admin import ReadOnlyModelAdmin, NoDeleteModelAdmin
 
 
 # Register your models here.
@@ -18,7 +18,7 @@ class NetworkForm(forms.ModelForm):
         endpoint_uri = self.cleaned_data.get("endpoint_uri")
         instance: Network = self.instance
 
-        if not Network.objects.filter(id=instance.id).exists():  # 如果是新建 Network，则不需要验证
+        if not Network.objects.filter(pk=instance.pk).exists():  # 如果是新建 Network，则不需要验证
             return endpoint_uri
 
         if (
@@ -29,7 +29,7 @@ class NetworkForm(forms.ModelForm):
 
 
 @admin.register(Network)
-class NetworkAdmin(ModelAdmin):
+class NetworkAdmin(NoDeleteModelAdmin):
     form = NetworkForm
     readonly_fields = ("chain_id",)
     list_display = ("name", "chain_id", "endpoint_uri")

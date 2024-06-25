@@ -38,7 +38,19 @@ class InvoiceAdmin(ReadOnlyModelAdmin):
 class PaymentAdmin(ReadOnlyModelAdmin):
     list_display = (
         "invoice",
-        "transaction",
+        "token",
         "value_display",
+        "transaction",
     )
+
+    def token(self, obj):
+        return obj.invoice.token
+
+    token.short_description = "代币"
+
+    def value_display(self, obj):
+        return obj.value_display
+
+    value_display.short_description = "支付数量"
+
     search_fields = ("invoice__no",)

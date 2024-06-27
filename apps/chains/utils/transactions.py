@@ -18,7 +18,7 @@ class TokenTransferTuple(NamedTuple):
 
 class TransactionParser:
     def __init__(self, transaction: Transaction) -> None:
-        self.network = transaction.block.network
+        self.chain = transaction.block.chain
         self.metadata = transaction.metadata
 
     @property
@@ -32,17 +32,17 @@ class TransactionParser:
 
     def _currency_transfer(self) -> TokenTransferTuple:
         return TokenTransferTuple(
-            self.network.currency, self.metadata["from"], self.metadata["to"], self.metadata["value"]
+            self.chain.currency, self.metadata["from"], self.metadata["to"], self.metadata["value"]
         )
 
     def _erc20_transfer(self) -> TokenTransferTuple:
-        receipt = self.network.w3.eth.get_transaction_receipt(self.metadata["hash"])
+        receipt = self.chain.w3.eth.get_transaction_receipt(self.metadata["hash"])
         transfer_event = erc20_contract.events.Transfer().process_receipt(receipt)[0]
 
-        network_token = TokenAddress.objects.get(network=self.network, address=transfer_event["address"])
+        chain_token = TokenAddress.objects.get(chain=self.chain, address=transfer_event["address"])
 
         return TokenTransferTuple(
-            network_token.token,
+            chain_token.token,
             transfer_event["args"]["from"],
             transfer_event["args"]["to"],
             transfer_event["args"]["value"],

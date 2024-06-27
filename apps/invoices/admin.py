@@ -23,7 +23,7 @@ class InvoiceAdmin(ReadOnlyModelAdmin):
         "out_no",
     )
     list_filter = (
-        "network",
+        "chain",
         "token",
     )
 

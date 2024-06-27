@@ -1,11 +1,11 @@
 from rest_framework import serializers
 
-from chains.models import Network
+from chains.models import Chain
 
 
-class NetworkSerializer(serializers.ModelSerializer):
+class ChainSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Network
+        model = Chain
         fields = (
             "chain_id",
             "name",

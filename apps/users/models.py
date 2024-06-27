@@ -33,5 +33,5 @@ class Player(models.Model):
 
 @receiver(pre_save, sender=Player)
 def add_deposit_account(sender, instance: Player, **kwargs):
-    if not instance.deposit_account:
-        instance.deposit_account = Account.generate()
+    if not instance.deposit_account_id:
+        instance.deposit_account_id = Account.generate().id

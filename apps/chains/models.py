@@ -4,7 +4,7 @@ import eth_abi
 from typing import cast
 
 from django.core.cache import cache
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, PermissionDenied
 from django.db import models
 from django.db import transaction as db_transaction
 from django.db.models import F, Sum
@@ -24,6 +24,7 @@ from web3.types import ChecksumAddress, HexStr, TxParams
 
 from common.fields import ChecksumAddressField, HexStr64Field
 from common.utils.crypto import aes_cipher
+from chains.utils import chain_metadata, chain_icon_url
 from globals.models import Project
 from invoices.models import Invoice, Payment
 from notifications.models import Notification
@@ -31,23 +32,22 @@ from tokens.models import Token, TokenAddress, AccountTokenBalance, TokenTransfe
 
 
 # Create your models here.
-class Network(models.Model):
-    chain_id = models.PositiveIntegerField(
-        _("Chain ID"), blank=True, help_text=_("根据RPC自动检测Chain ID，无需填写；"), primary_key=True
+class Chain(models.Model):
+    chain_id = models.PositiveIntegerField(_("Chain ID"), blank=True, primary_key=True)
+    name = models.CharField(_("名称"), max_length=32, unique=True, blank=True)
+    currency = models.ForeignKey(
+        "tokens.Token", verbose_name="原生代币", on_delete=models.PROTECT, blank=True, related_name="chains_as_currency"
     )
-    name = models.CharField(_("名称"), max_length=32, unique=True)
-    currency_symbol = models.CharField(_("主币名"), max_length=64, unique=True, help_text=_("如：ETH、BNB、MATIC 等；"))
-    currency = models.OneToOneField("tokens.Token", on_delete=models.PROTECT, editable=False, blank=True)
     is_poa = models.BooleanField(_("是否为 POA 网络"), blank=True, editable=False)
-    endpoint_uri = models.CharField(_("HTTP RPC 节点地址"), max_length=256, unique=True)
+    endpoint_uri = models.CharField(_("HTTP RPC 节点地址"), help_text="只需填写 RPC 地址，会自动识别公链信息", max_length=256, unique=True)
 
     block_confirmations_count = models.PositiveSmallIntegerField(
         verbose_name=_("区块确认数量"),
         default=18,
-        help_text=_(
-            "交易的确认数越多，则该交易在区块链中埋的越深，就越不容易被篡改；<br/>高于此确认数，系统将认定此交易被区块链最终接受；"
-            "<br/>数值参考：<br/>ETH: 12; BSC: 15; Others: 16；"
-        ),
+        blank=True,
+        help_text="交易的确认数越多，则该交易在区块链中埋的越深，就越不容易被篡改；<br/>"
+        "高于此确认数，系统将认定此交易被区块链最终接受；<br/>"
+        "数值参考：<br>ETH: 12; BSC: 15; Others: 16；",
     )
     active = models.BooleanField(default=True, verbose_name=_("启用"))
 
@@ -57,13 +57,9 @@ class Network(models.Model):
     def __str__(self):
         return f"{self.name}"
 
-    def delete(self, *args, **kwargs):
-        raise ValidationError(_("为保护数据完整性，禁止删除."))
-
-    # 如果你想确保批量删除也被阻止，可以覆盖 delete 方法
-    @classmethod
-    def delete_queryset(cls, queryset):
-        raise ValidationError(_("为保护数据完整性，禁止删除."))
+    @property
+    def icon(self):
+        return chain_icon_url(self.chain_id)
 
     @property
     def gas_price(self) -> int:
@@ -89,8 +85,7 @@ class Network(models.Model):
 
     def is_transaction_should_be_processed(self, tx: dict) -> bool:
         if (
-            tx["input"].startswith("0xa9059cbb")
-            and TokenAddress.objects.filter(network=self, address=tx["to"]).exists()
+            tx["input"].startswith("0xa9059cbb") and TokenAddress.objects.filter(chain=self, address=tx["to"]).exists()
         ):  # 平台所支持的 ERC20 代币的转账 (transfer)
             return True
 
@@ -157,12 +152,12 @@ class Network(models.Model):
 
     @property
     def max_block_number(self) -> int:
-        max_block = Block.objects.filter(network=self).order_by("-number").first()
+        max_block = Block.objects.filter(chain=self).order_by("-number").first()
         return max_block.number
 
     @property
     async def amax_block_number(self) -> int | None:
-        max_block = await Block.objects.filter(network=self).order_by("-number").afirst()
+        max_block = await Block.objects.filter(chain=self).order_by("-number").afirst()
         return max_block.number if max_block else None
 
     @property
@@ -186,33 +181,49 @@ class Network(models.Model):
         return no_need
 
     class Meta:
-        verbose_name = _("网络")
-        verbose_name_plural = _("网络")
+        ordering = ("chain_id",)
+        verbose_name = _("公链")
+        verbose_name_plural = _("公链")
 
 
-@receiver(post_save, sender=Network)
-def networks_changed(*args, **kwargs):
-    cache.set("networks_changed", True)
+@receiver(post_save, sender=Chain)
+def chains_changed(*args, **kwargs):
+    cache.set("chains_changed", True)
 
 
-@receiver(pre_save, sender=Network)
-def network_fill_up(sender, instance: Network, **kwargs):
-    if not Network.objects.filter(pk=instance.pk).exists():
-        # 如果是新创建，则需要自动把以下字段补充完整
+@receiver(pre_save, sender=Chain)
+def chain_fill_up(sender, instance: Chain, **kwargs):
+    if not Chain.objects.filter(pk=instance.pk).exists():
         instance.is_poa = instance.get_is_poa
         instance.chain_id = instance.w3.eth.chain_id
-        instance.currency = Token.objects.create(
-            pk=instance.chain_id, symbol=instance.currency_symbol, type=TokenType.Base
-        )
 
-    instance.currency.symbol = instance.currency_symbol
-    instance.currency.save()
+        metadata = chain_metadata(instance.chain_id)
+        if not metadata:
+            raise ValidationError("不支持此网络.")
+
+        instance.name = metadata["name"]
+
+        try:
+            token = Token.objects.get(symbol=metadata["currency"]["symbol"])
+            if token.decimals != metadata["currency"]["decimals"] or token.type != TokenType.Native:
+                raise ValidationError("此网络的原生代币与系统中已存在的代币冲突.")
+        except Token.DoesNotExist:
+            token = Token.objects.create(
+                symbol=metadata["currency"]["symbol"],
+                decimals=metadata["currency"]["decimals"],
+                type=TokenType.Native,
+            )
+        instance.currency = token
+
+        TokenAddress.objects.create(
+            token=instance.currency, chain=instance, address="0x0000000000000000000000000000000000000000"
+        )
 
 
 class Block(models.Model):
     hash = HexStr64Field()
     parent = models.OneToOneField("chains.Block", on_delete=models.CASCADE, blank=True, null=True)
-    network = models.ForeignKey("chains.Network", on_delete=models.PROTECT)
+    chain = models.ForeignKey("chains.Chain", on_delete=models.PROTECT)
     number = models.PositiveIntegerField(db_index=True)
     timestamp = models.PositiveIntegerField()
 
@@ -224,13 +235,13 @@ class Block(models.Model):
 
     @property
     def confirm_process(self):
-        return min(((self.network.max_block_number - self.number) / self.network.block_confirmations_count), 1)
+        return min(((self.chain.max_block_number - self.number) / self.chain.block_confirmations_count), 1)
 
     def confirm(self) -> bool:
         if self.confirmed:
             return True
 
-        if self.network.is_block_confirmed(block_number=self.number, block_hash=self.hash):
+        if self.chain.is_block_confirmed(block_number=self.number, block_hash=self.hash):
             self.confirmed = True
             self.save()
             return True
@@ -239,15 +250,15 @@ class Block(models.Model):
             return False
 
     def __str__(self):
-        return f"{self.network.name}-{self.number}"
+        return f"{self.chain.name}-{self.number}"
 
     class Meta:
         ordering = (
-            "network",
+            "chain",
             "-number",
         )
         unique_together = (
-            "network",
+            "chain",
             "number",
         )
         verbose_name = _("区块")
@@ -292,7 +303,7 @@ class Transaction(models.Model):
 
             self.parse()
 
-            if self.block.network.project.pre_notify:
+            if self.block.chain.project.pre_notify:
                 self.notify(as_pre=True)
 
     def confirm(self):
@@ -302,7 +313,7 @@ class Transaction(models.Model):
 
     def link_platform_tx(self):
         try:
-            platform_tx = PlatformTransaction.objects.get(network=self.block.network, hash=self.hash)
+            platform_tx = PlatformTransaction.objects.get(chain=self.block.chain, hash=self.hash)
             platform_tx.transaction = self
             platform_tx.save()
 
@@ -369,7 +380,7 @@ class Transaction(models.Model):
         elif Invoice.objects.filter(
             pay_address=token_transfer.to_address,
             token=token_transfer.token,
-            network=self.block.network,
+            chain=self.block.chain,
             platform_tx__transaction__isnull=True,  # 账单如果已经归集了，那任何支付都是无效的
         ).exists():  # 如果接收代币的是账单地址，代表支付账单的行为
             _type = Transaction.Type.Paying
@@ -396,7 +407,7 @@ class Transaction(models.Model):
                 invoice = Invoice.objects.get(
                     pay_address=token_transfer.to_address,
                     token=token_transfer.token,
-                    network=self.block.network,
+                    chain=self.block.chain,
                     platform_tx__isnull=True,
                 )
                 Payment.objects.create(transaction=self, invoice=invoice, value=token_transfer.value)
@@ -411,11 +422,11 @@ class Transaction(models.Model):
                 account_as_from = Account.objects.get(address=token_transfer.from_address)
 
                 account_as_from.alter_balance(
-                    network=self.block.network, token=token_transfer.token, value=-token_transfer.value
+                    chain=self.block.chain, token=token_transfer.token, value=-token_transfer.value
                 )  # 先扣代币
                 account_as_from.alter_balance(
-                    network=self.block.network,
-                    token=self.block.network.currency,
+                    chain=self.block.chain,
+                    token=self.block.chain.currency,
                     value=-(self.metadata["gasPrice"] * self.receipt["gasUsed"]),
                 )  # 再扣 Gas
             except Account.DoesNotExist:
@@ -424,7 +435,7 @@ class Transaction(models.Model):
             try:
                 account_as_to = Account.objects.get(address=token_transfer.to_address)
                 account_as_to.alter_balance(
-                    network=self.block.network, token=token_transfer.token, value=token_transfer.value
+                    chain=self.block.chain, token=token_transfer.token, value=token_transfer.value
                 )
             except Account.DoesNotExist:
                 pass
@@ -448,8 +459,8 @@ class Transaction(models.Model):
     @property
     def tx_data(self) -> dict:
         return {
-            "network": self.block.network.name,
-            "chain_id": self.block.network.chain_id,
+            "chain": self.block.chain.name,
+            "chain_id": self.block.chain.chain_id,
             "block": self.block.number,
             "hash": self.hash,
             "timestamp": self.block.timestamp,
@@ -509,11 +520,11 @@ class Account(models.Model):
         else:
             return _("系统账户")
 
-    def alter_balance(self, network, token, value: int):
+    def alter_balance(self, chain, token, value: int):
         try:
-            balance = AccountTokenBalance.objects.select_for_update().get(account=self, network=network, token=token)
+            balance = AccountTokenBalance.objects.select_for_update().get(account=self, chain=chain, token=token)
         except AccountTokenBalance.DoesNotExist:
-            balance, _ = AccountTokenBalance.objects.get_or_create(account=self, network=network, token=token)
+            balance, _ = AccountTokenBalance.objects.get_or_create(account=self, chain=chain, token=token)
             balance = AccountTokenBalance.objects.select_for_update().get(pk=balance.pk)
 
         balance.value = F("value") + value
@@ -543,15 +554,15 @@ class Account(models.Model):
     def private_key(self):
         return aes_cipher.decrypt(self.encrypted_private_key)
 
-    def balance(self, network: Network) -> int:
-        return network.get_balance(self.address)
+    def balance(self, chain: Chain) -> int:
+        return chain.get_balance(self.address)
 
-    def nonce(self, network: Network) -> int:
-        return PlatformTransaction.objects.filter(network=network, account=self).count()
+    def nonce(self, chain: Chain) -> int:
+        return PlatformTransaction.objects.filter(chain=chain, account=self).count()
 
-    def send_eth(self, network: Network, to: ChecksumAddress, value: int):
+    def send_eth(self, chain: Chain, to: ChecksumAddress, value: int):
         return PlatformTransaction.objects.create(
-            account=self, network=network, to=to, value=value, nonce=self.nonce(network)
+            account=self, chain=chain, to=to, value=value, nonce=self.nonce(chain)
         )
 
     @staticmethod
@@ -566,22 +577,27 @@ class Account(models.Model):
 
         return "0xa9059cbb" + encoded_params.hex()  # type: ignore
 
-    def send_token(self, network: Network, token: Token, to: ChecksumAddress, value: int):
-        if network.currency == token:
-            return self.send_eth(network, to, value)
+    def send_token(self, chain: Chain, token: Token, to: ChecksumAddress, value: int):
+        if chain.currency == token:
+            return self.send_eth(chain, to, value)
 
-        token_address = TokenAddress.objects.get(network=network, token=token).address
+        token_address = TokenAddress.objects.get(chain=chain, token=token).address
 
         return PlatformTransaction.objects.create(
             account=self,
-            network=network,
+            chain=chain,
             to=token_address,
-            nonce=self.nonce(network),
+            nonce=self.nonce(chain),
             data=self.get_erc20_transfer_data(to, value),
         )
 
     def delete(self, *args, **kwargs):
-        raise PermissionDenied(_("禁止删除."))
+        raise ValidationError(_("为保护数据完整性，禁止删除."))
+
+    # 如果你想确保批量删除也被阻止，可以覆盖 delete 方法
+    @classmethod
+    def delete_queryset(cls, queryset):
+        raise ValidationError(_("为保护数据完整性，禁止删除."))
 
     def clear_tx_callable_failed_times(self):
         self.tx_callable_failed_times = 0
@@ -594,7 +610,7 @@ class Account(models.Model):
 
 
 class PlatformTransaction(models.Model):
-    network = models.ForeignKey("chains.Network", on_delete=models.PROTECT, verbose_name=_("网络"))
+    chain = models.ForeignKey("chains.Chain", on_delete=models.DO_NOTHING, verbose_name=_("网络"))
 
     account = models.ForeignKey("chains.Account", on_delete=models.PROTECT, verbose_name=_("账户"))
     nonce = models.PositiveIntegerField(_("Nonce"))
@@ -616,18 +632,18 @@ class PlatformTransaction(models.Model):
         if self.hash:
             return self.hash
         else:
-            return f"{self.network.name}-{self.account.address}-{self.nonce}"
+            return f"{self.chain.name}-{self.account.address}-{self.nonce}"
 
     def generate_transaction_dict(self) -> dict:
         transaction = {
-            "chainId": self.network.chain_id,
+            "chainId": self.chain.chain_id,
             "nonce": self.nonce,
             "from": self.account.address,
             "to": self.to,
             "value": int(self.value),
             "data": self.data if self.data else b"",
             "gas": self.gas,
-            "gasPrice": self.network.gas_price * 1,
+            "gasPrice": self.chain.gas_price * 1,
         }
 
         return transaction
@@ -639,7 +655,7 @@ class PlatformTransaction(models.Model):
         :return:
         """
         try:
-            self.network.w3.eth.call(cast(TxParams, transaction))
+            self.chain.w3.eth.call(cast(TxParams, transaction))
         except ValueError:
             return False
         else:
@@ -657,15 +673,13 @@ class PlatformTransaction(models.Model):
             return False
 
         if self.is_transaction_callable(transaction_dict):
-            signed_transaction = self.network.w3.eth.account.sign_transaction(
-                transaction_dict, self.account.private_key
-            )
+            signed_transaction = self.chain.w3.eth.account.sign_transaction(transaction_dict, self.account.private_key)
 
             self.hash = signed_transaction.hash.hex()
             self.transacted_at = timezone.now()
             self.save()
 
-            self.network.w3.eth.send_raw_transaction(signed_transaction.rawTransaction)
+            self.chain.w3.eth.send_raw_transaction(signed_transaction.rawTransaction)
             return True
         else:
             self.account.tx_callable_failed_times += 1
@@ -673,12 +687,17 @@ class PlatformTransaction(models.Model):
             return False
 
     def delete(self, *args, **kwargs):
-        raise PermissionDenied(_("禁止删除."))
+        raise ValidationError(_("为保护数据完整性，禁止删除."))
+
+    # 如果你想确保批量删除也被阻止，可以覆盖 delete 方法
+    @classmethod
+    def delete_queryset(cls, queryset):
+        raise ValidationError(_("为保护数据完整性，禁止删除."))
 
     class Meta:
         unique_together = (
             "account",
-            "network",
+            "chain",
             "nonce",
         )
 

@@ -13,7 +13,7 @@ class WithdrawalAdmin(ReadOnlyModelAdmin):
         "no",
         "player",
         "to",
-        "network",
+        "chain",
         "token",
         "value",
     )
@@ -24,7 +24,7 @@ class WithdrawalAdmin(ReadOnlyModelAdmin):
     )
     list_filter = ("token",)
 
-    def network(self, obj):
-        return obj.platform_tx.network.name
+    def chain(self, obj):
+        return obj.platform_tx.chain.name
 
-    network.short_description = "网络"
+    chain.short_description = "网络"

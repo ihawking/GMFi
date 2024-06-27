@@ -2,8 +2,8 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.serializers import Serializer
 
-from chains.models import Network
-from chains.serializers import NetworkSerializer
+from chains.models import Chain
+from chains.serializers import ChainSerializer
 from invoices.models import Invoice, Payment
 from tokens.models import Token
 
@@ -13,7 +13,7 @@ class InvoiceCreateSerializer(Serializer):
     subject = serializers.CharField(max_length=64)
     detail = serializers.JSONField(default=dict)
     token = serializers.CharField(required=True)
-    network = serializers.CharField(required=True)
+    chain = serializers.CharField(required=True)
     value = serializers.DecimalField(required=True, max_digits=32, decimal_places=8)
     duration = serializers.IntegerField(default=60)
 
@@ -22,20 +22,20 @@ class InvoiceCreateSerializer(Serializer):
             raise serializers.ValidationError(_("代币未创建."))
         return value
 
-    def validate_network(self, value):
-        if not Network.objects.filter(name=value).exists():
-            raise serializers.ValidationError(_("网络不存在."))
+    def validate_chain(self, value):
+        if not Chain.objects.filter(name=value, active=True).exists():
+            raise serializers.ValidationError(_("网络不可用."))
         return value
 
     @staticmethod
-    def _is_network_token_supported(attrs) -> bool:
-        network = Network.objects.get(name=attrs["network"])
+    def _is_chain_token_supported(attrs) -> bool:
+        chain = Chain.objects.get(name=attrs["chain"])
         token = Token.objects.get(symbol=attrs["token"])
 
-        return token.support_this_network(network)
+        return token.support_this_chain(chain)
 
     def validate(self, attrs):
-        if not self._is_network_token_supported(attrs):
+        if not self._is_chain_token_supported(attrs):
             raise serializers.ValidationError(_("网络与代币不匹配."))
 
         if attrs["duration"] < 10 or attrs["duration"] > 2 * 60:
@@ -48,7 +48,7 @@ class InvoiceCreateSerializer(Serializer):
 
 
 class InvoiceSerializer(serializers.ModelSerializer):
-    network = NetworkSerializer(read_only=True)
+    chain = ChainSerializer(read_only=True)
     pay_url = serializers.SerializerMethodField(default="")
 
     def get_pay_url(self, obj):
@@ -63,7 +63,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "out_no",
             "subject",
             "detail",
-            "network",
+            "chain",
             "token_symbol",
             "token_address",
             "pay_address",

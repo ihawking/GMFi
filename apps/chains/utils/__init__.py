@@ -1,5 +1,41 @@
 from eth_account.messages import encode_typed_data
 from web3.auto import w3
+import json
+
+from django.conf import settings
+
+
+def chain_icon_url(chain_id):
+    slugs_path = settings.BASE_DIR / "apps" / "chains" / "data" / "slugs.json"
+
+    with open(slugs_path, "r", encoding="utf-8") as file:
+        slugs_data = json.load(file)
+
+    slug = slugs_data[str(chain_id)] if str(chain_id) in slugs_data else None
+
+    return f"https://icons.llamao.fi/icons/chains/rsz_{slug}.jpg" if slug else None
+
+
+def chain_metadata(chain_id):
+    # 指定JSON文件的路径
+    file_path = settings.BASE_DIR / "apps" / "chains" / "data" / "chains.json"
+
+    # 打开并读取JSON文件
+    with open(file_path, "r", encoding="utf-8") as file:
+        chains = json.load(file)
+
+    for chain in chains:
+        if chain["chainId"] == chain_id:
+            data = {
+                "name": chain["name"],
+                "symbol": chain["chain"],
+                "currency": {
+                    "name": chain["nativeCurrency"]["name"],
+                    "symbol": chain["nativeCurrency"]["symbol"],
+                    "decimals": chain["nativeCurrency"]["decimals"],
+                },
+            }
+            return data
 
 
 class TransactionTypedDataSignature:

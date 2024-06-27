@@ -9,7 +9,7 @@ from rest_framework import viewsets
 from rest_framework.response import Response
 from web3.types import HexStr
 
-from chains.models import Network
+from chains.models import Chain
 from chains.utils import create2
 from common.utils.crypto import generate_random_code
 from globals.models import Project
@@ -24,14 +24,14 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     serializer_class = InvoiceSerializer
 
     @staticmethod
-    def get_init_code(network: Network, token: Token):
+    def get_init_code(chain: Chain, token: Token):
         project = Project.objects.get(pk=1)
-        if network.currency == token:
+        if chain.currency == token:
             constructor_arguments = [project.collection_address]
             encoded_arguments = eth_abi.encode(["address"], constructor_arguments)
             init_code = ETHInvoice + encoded_arguments.hex()
         else:
-            constructor_arguments = [token.address(network), project.collection_address]
+            constructor_arguments = [token.address(chain), project.collection_address]
             encoded_arguments = eth_abi.encode(["address", "address"], constructor_arguments)
             init_code = ERC20Invoice + encoded_arguments.hex()
 
@@ -45,11 +45,11 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
         project = Project.objects.get(pk=1)
         token = Token.objects.get(symbol=validated_data["token"])
-        network = Network.objects.get(name=validated_data["network"])
+        chain = Chain.objects.get(name=validated_data["chain"])
 
         with db_transaction.atomic():
             salt = os.urandom(32).hex()
-            init_code = self.get_init_code(network, token)
+            init_code = self.get_init_code(chain, token)
 
             pay_address = create2.predict_address(HexStr(salt), init_code)
 
@@ -59,7 +59,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 subject=validated_data["subject"],
                 detail=validated_data["detail"],
                 token=token,
-                network=network,
+                chain=chain,
                 value=validated_data["value"],
                 expired_time=timezone.now() + timedelta(minutes=validated_data["duration"]),
                 salt=salt,

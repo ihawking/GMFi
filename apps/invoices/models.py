@@ -22,7 +22,7 @@ class Invoice(models.Model):
     subject = models.CharField(_("标题"), max_length=32)
     detail = models.JSONField(_("详情"), default=dict)
     token = models.ForeignKey("tokens.Token", on_delete=models.PROTECT, verbose_name=_("代币"))
-    network = models.ForeignKey("chains.Network", on_delete=models.PROTECT, verbose_name=_("网络"))
+    chain = models.ForeignKey("chains.Chain", on_delete=models.PROTECT, verbose_name=_("网络"))
     value = models.DecimalField(_("应付数量"), max_digits=32, decimal_places=8)
     expired_time = models.DateTimeField(_("支付截止时间"))
     redirect_url = models.URLField(_("支付成功后重定向地址"), null=True, blank=True)
@@ -49,7 +49,7 @@ class Invoice(models.Model):
             "data": {
                 "no": self.no,
                 "out_no": self.out_no,
-                "network": self.network.name,
+                "chain": self.chain.name,
                 "token": self.token_symbol,
                 "value": float(self.value),
                 "actual_value": float(self.actual_value),
@@ -63,7 +63,7 @@ class Invoice(models.Model):
 
     @property
     def token_address(self):
-        return self.token.address(self.network)
+        return self.token.address(self.chain)
 
     @property
     def gathered(self):
@@ -76,10 +76,10 @@ class Invoice(models.Model):
 
     @property
     def chain_id(self):
-        return self.network.chain_id
+        return self.chain.chain_id
 
     def gather(self):
-        account = self.network.project.distribution_account
+        account = self.chain.project.distribution_account
 
         account.get_lock()
         with db_transaction.atomic():
@@ -87,10 +87,10 @@ class Invoice(models.Model):
 
             self.platform_tx = PlatformTransaction.objects.create(
                 account=account,
-                network=self.network,
+                chain=self.chain,
                 to=create2.factory_address,
                 gas=160000,
-                nonce=account.nonce(self.network),
+                nonce=account.nonce(self.chain),
                 data=create2.get_transaction_data(
                     salt=cast(HexStr, self.salt), init_code=cast(HexStr, self.init_code)
                 ),

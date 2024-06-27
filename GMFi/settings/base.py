@@ -206,9 +206,9 @@ UNFOLD = {
                 "separator": True,
                 "items": [
                     {
-                        "title": _("网络"),
+                        "title": _("公链"),
                         "icon": "lan",
-                        "link": reverse_lazy("admin:chains_network_changelist"),
+                        "link": reverse_lazy("admin:chains_chain_changelist"),
                     },
                     {
                         "title": _("区块"),

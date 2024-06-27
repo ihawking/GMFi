@@ -3,7 +3,7 @@ from django.http.response import HttpResponse
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 
-from chains.models import Network
+from chains.models import Chain
 from globals.models import Project
 from tokens.models import Token
 from users.models import Player
@@ -21,17 +21,17 @@ class WithdrawalViewSet(viewsets.ModelViewSet):
         validated_data = serializer.validated_data
 
         player, _ = Player.objects.get_or_create(uid=validated_data["uid"])
-        network = Network.objects.get(name=validated_data["network"])
+        chain = Chain.objects.get(name=validated_data["chain"])
         token = Token.objects.get(symbol=validated_data["symbol"])
 
         value = validated_data["value"]
 
-        account = network.project.distribution_account
+        account = chain.project.distribution_account
         account.get_lock()
 
         with db_tx.atomic():
             platform_tx = account.send_token(
-                network=network, token=token, to=validated_data["to"], value=int(value * 10**token.decimals)
+                chain=chain, token=token, to=validated_data["to"], value=int(value * 10**token.decimals)
             )
             Withdrawal.objects.create(
                 no=validated_data["no"],

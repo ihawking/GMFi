@@ -9,10 +9,10 @@ from common.utils.time import ago
 @shared_task(time_limit=64, soft_time_limit=32)
 def filter_and_store_tx(block_pk, tx_metadata):
     block = Block.objects.get(pk=block_pk)
-    network = block.network
+    chain = block.chain
 
-    if network.is_transaction_should_be_processed(tx_metadata):
-        receipt = network.get_transaction_receipt(tx_hash=tx_metadata["hash"])
+    if chain.is_transaction_should_be_processed(tx_metadata):
+        receipt = chain.get_transaction_receipt(tx_hash=tx_metadata["hash"])
         Transaction.objects.create(
             hash=tx_metadata["hash"],
             block=block,
@@ -38,8 +38,8 @@ def confirm_past_blocks(block_id):
     latest_block = Block.objects.get(pk=block_id)
 
     for block in Block.objects.filter(
-        network=latest_block.network,
-        number__lte=max(1, latest_block.number - latest_block.network.block_confirmations_count),
+        chain=latest_block.chain,
+        number__lte=max(1, latest_block.number - latest_block.chain.block_confirmations_count),
         confirmed=False,
     ).order_by("number")[:8]:
         if block.confirm():

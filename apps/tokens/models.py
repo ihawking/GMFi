@@ -1,43 +1,43 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from common.fields import ChecksumAddressField
-from django.core.exceptions import PermissionDenied
 
 # Create your models here.
 
 
 class TokenType(models.TextChoices):
-    Base = "Base", _("主币")
+    Native = "Native", _("原生代币")
     ERC20 = "ERC20", _("ERC20")
 
 
 class Token(models.Model):
     symbol = models.CharField(_("代号"), max_length=8, help_text=_("例如：USDT、UNI"), unique=True)
     decimals = models.PositiveSmallIntegerField(_("精度"), default=18)
-    networks = models.ManyToManyField("chains.Network", through="tokens.TokenAddress", related_name="tokens")
-    price_in_usdt = models.DecimalField(_("价格（USD）"), blank=True, null=True, decimal_places=8, max_digits=32)
-    type = models.CharField(
-        choices=TokenType.choices, default=TokenType.ERC20, max_length=8, editable=False, verbose_name=_("类型")
+    chains = models.ManyToManyField("chains.Chain", through="tokens.TokenAddress", related_name="tokens")
+
+    coingecko_id = models.CharField(
+        max_length=32,
+        verbose_name="Coingecko API ID",
+        help_text=_("用于自动从Coingecko获取代币USD价格<br/>可以从Coingecko代币详情页面找到此值<br/>如果想手动设置价格，或者代币未上架Coingecko，则留空<br/>"),
+        unique=True,
+        blank=True,
+        null=True,
     )
-    active = models.BooleanField(default=True, verbose_name="启用", help_text="是否启用本代币（仅对主币生效）")
+    price_in_usd = models.DecimalField(_("价格（USD）"), blank=True, null=True, decimal_places=8, max_digits=32)
+    type = models.CharField(choices=TokenType.choices, default=TokenType.ERC20, max_length=16, editable=False)
 
-    def support_this_network(self, network) -> bool:
-        if network.currency == self:
-            return self.active
-        else:
-            if TokenAddress.objects.filter(network=network, token=self, active=True).exists():
-                return True
+    @property
+    def is_currency(self):
+        return self.type == TokenType.Native
 
-        return False
+    def support_this_chain(self, chain) -> bool:
+        return TokenAddress.objects.filter(chain=chain, token=self, active=True).exists()
 
-    def address(self, network):
+    def address(self, chain):
         try:
-            return TokenAddress.objects.get(token=self, network=network).address
+            return TokenAddress.objects.get(token=self, chain=chain).address
         except TokenAddress.DoesNotExist:
             return None
-
-    def delete(self, *args, **kwargs):
-        raise PermissionDenied(_("为保护数据完整性，禁止删除."))
 
     def __str__(self):
         return f"{self.symbol}"
@@ -48,14 +48,17 @@ class Token(models.Model):
 
 
 class TokenAddress(models.Model):
-    token = models.ForeignKey("tokens.Token", on_delete=models.PROTECT)
-    network = models.ForeignKey("chains.Network", on_delete=models.PROTECT, verbose_name=_("所在的网络"))
+    token = models.ForeignKey("tokens.Token", on_delete=models.CASCADE, verbose_name=_("代币"))
+    chain = models.ForeignKey("chains.Chain", on_delete=models.CASCADE, verbose_name=_("公链"))
     address = ChecksumAddressField(_("代币地址"))
 
-    active = models.BooleanField(default=True, verbose_name="启用", help_text="是否启用本代币（仅对ERC20生效）")
+    active = models.BooleanField(default=True, verbose_name="启用", help_text="是否启用本代币")
+
+    def __str__(self):
+        return f"{self.chain.name} - {self.token.symbol}"
 
     class Meta:
-        unique_together = ("token", "network")
+        unique_together = ("token", "chain")
 
         verbose_name = _("代币地址")
         verbose_name_plural = _("代币地址")
@@ -86,14 +89,14 @@ class PlayerTokenValue(models.Model):
 
 class AccountTokenBalance(models.Model):
     account = models.ForeignKey("chains.Account", on_delete=models.PROTECT)
-    network = models.ForeignKey("chains.Network", on_delete=models.PROTECT)
+    chain = models.ForeignKey("chains.Chain", on_delete=models.PROTECT)
     token = models.ForeignKey("tokens.Token", on_delete=models.PROTECT)
     value = models.DecimalField(max_digits=36, decimal_places=0, default=0)
 
     class Meta:
         unique_together = (
             "account",
-            "network",
+            "chain",
             "token",
         )
         verbose_name = _("余额")

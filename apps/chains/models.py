@@ -7,7 +7,7 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError, PermissionDenied
 from django.db import models
 from django.db import transaction as db_transaction
-from django.db.models import F, Sum
+from django.db.models import F, Sum, Q
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -36,10 +36,16 @@ class Chain(models.Model):
     chain_id = models.PositiveIntegerField(_("Chain ID"), blank=True, primary_key=True)
     name = models.CharField(_("名称"), max_length=32, unique=True, blank=True)
     currency = models.ForeignKey(
-        "tokens.Token", verbose_name="原生代币", on_delete=models.PROTECT, blank=True, related_name="chains_as_currency"
+        "tokens.Token",
+        verbose_name="原生代币",
+        on_delete=models.PROTECT,
+        blank=True,
+        related_name="chains_as_currency",
     )
     is_poa = models.BooleanField(_("是否为 POA 网络"), blank=True, editable=False)
-    endpoint_uri = models.CharField(_("HTTP RPC 节点地址"), help_text="只需填写 RPC 地址，会自动识别公链信息", max_length=256, unique=True)
+    endpoint_uri = models.CharField(
+        _("HTTP RPC 节点地址"), help_text="只需填写 RPC 地址，会自动识别公链信息", max_length=256, unique=True
+    )
 
     block_confirmations_count = models.PositiveSmallIntegerField(
         verbose_name=_("区块确认数量"),
@@ -49,7 +55,9 @@ class Chain(models.Model):
         "高于此确认数，系统将认定此交易被区块链最终接受；<br/>"
         "数值参考：<br>ETH: 12; BSC: 15; Others: 16；",
     )
-    active = models.BooleanField(default=True, verbose_name=_("启用"))
+    active = models.BooleanField(
+        default=True, verbose_name=_("启用"), help_text="关闭将会停止接受此链出块信息，且停止与其相关的接口调用"
+    )
 
     created_at = models.DateTimeField(_("创建时间"), auto_now_add=True)
     updated_at = models.DateTimeField(_("更新时间"), auto_now=True)
@@ -73,6 +81,9 @@ class Chain(models.Model):
 
     def get_transaction_receipt(self, tx_hash: HexStr) -> dict:
         return json.loads(Web3.to_json(self.w3.eth.get_transaction_receipt(tx_hash)))
+
+    def get_transaction(self, tx_hash: HexStr) -> dict:
+        return json.loads(Web3.to_json(self.w3.eth.get_transaction(tx_hash)))
 
     def get_block(self, block_number: int) -> dict:
         return json.loads(Web3.to_json(self.w3.eth.get_block(block_number)))
@@ -292,6 +303,7 @@ class Transaction(models.Model):
 
     type = models.CharField(_("类型"), max_length=16, choices=Type.choices, blank=True, null=True)
 
+    @db_transaction.atomic
     def initialize(self):
         self.link_platform_tx()
 
@@ -306,14 +318,21 @@ class Transaction(models.Model):
             if self.block.chain.project.pre_notify:
                 self.notify(as_pre=True)
 
+    @db_transaction.atomic
     def confirm(self):
+        try:
+            self.set_token_transfer()
+        except:
+            pass
         if self.success:
             self.notify()
             self.update_account_balance()
 
     def link_platform_tx(self):
         try:
-            platform_tx = PlatformTransaction.objects.get(chain=self.block.chain, hash=self.hash)
+            platform_tx = PlatformTransaction.objects.get(
+                chain=self.block.chain, account=self.metadata["from"], nonce=self.metadata["nonce"]
+            )
             platform_tx.transaction = self
             platform_tx.save()
 
@@ -327,7 +346,9 @@ class Transaction(models.Model):
         return tx_parser.token_transfer
 
     def set_token_transfer(self):
-        if hasattr(self, "platform_tx") and hasattr(self.platform_tx, "invoice"):  # 部署账单合约，是特殊情况，因为无法通过解析交易得到内部转账信息
+        if hasattr(self, "platform_tx") and hasattr(
+            self.platform_tx, "invoice"
+        ):  # 部署账单合约，是特殊情况，因为无法通过解析交易得到内部转账信息
             invoice = self.platform_tx.invoice
             TokenTransfer.objects.create(
                 transaction=self,
@@ -349,7 +370,9 @@ class Transaction(models.Model):
     def set_type(self):
         token_transfer = self.token_transfer
 
-        if hasattr(self, "platform_tx") and hasattr(self.platform_tx, "invoice"):  # 部署账单合约是特殊情况，因为无法通过解析得到内部转账信息
+        if hasattr(self, "platform_tx") and hasattr(
+            self.platform_tx, "invoice"
+        ):  # 部署账单合约是特殊情况，因为无法通过解析得到内部转账信息
             _type = Transaction.Type.InvoiceGathering
 
         elif Project.objects.filter(
@@ -419,16 +442,20 @@ class Transaction(models.Model):
             token_transfer = self.token_transfer
 
             try:
-                account_as_from = Account.objects.get(address=token_transfer.from_address)
-
-                account_as_from.alter_balance(
-                    chain=self.block.chain, token=token_transfer.token, value=-token_transfer.value
-                )  # 先扣代币
-                account_as_from.alter_balance(
+                account_as_tx_from = Account.objects.get(address=self.metadata["from"])
+                account_as_tx_from.alter_balance(
                     chain=self.block.chain,
                     token=self.block.chain.currency,
                     value=-(self.metadata["gasPrice"] * self.receipt["gasUsed"]),
-                )  # 再扣 Gas
+                )  # 扣 Gas
+            except Account.DoesNotExist:
+                pass
+
+            try:
+                account_as_from = Account.objects.get(address=token_transfer.from_address)
+                account_as_from.alter_balance(
+                    chain=self.block.chain, token=token_transfer.token, value=-token_transfer.value
+                )
             except Account.DoesNotExist:
                 pass
 
@@ -619,7 +646,6 @@ class PlatformTransaction(models.Model):
     data = models.TextField(_("Data"), blank=True, null=True)
     gas = models.PositiveIntegerField(_("Gas"), default=160000)
 
-    hash = HexStr64Field(blank=True, null=True)
     transaction = models.OneToOneField(
         "chains.Transaction", on_delete=models.SET_NULL, verbose_name=_("交易"), null=True, related_name="platform_tx"
     )
@@ -629,8 +655,8 @@ class PlatformTransaction(models.Model):
     updated_at = models.DateTimeField(_("更新时间"), auto_now=True)
 
     def __str__(self):
-        if self.hash:
-            return self.hash
+        if self.transaction:
+            return self.transaction.hash
         else:
             return f"{self.chain.name}-{self.account.address}-{self.nonce}"
 
@@ -661,6 +687,23 @@ class PlatformTransaction(models.Model):
         else:
             return True
 
+    @db_transaction.atomic
+    def check_tx(self):
+        if PlatformTransaction.objects.filter(
+            chain=self.chain, account=self.account, nonce__gt=self.nonce, transaction__isnull=False
+        ).exists():
+            # 如果存在比当前nonce更大的交易完成，说明本次交易已经提交成功，只不过没有入库，所以仅需根据hash查询交易入库就行了
+            try:
+                self.transaction = Transaction.objects.get(
+                    block__chain=self.chain, metadata__from=self.account.address, metadata__nonce=self.nonce
+                )
+                self.save()
+            except Transaction.DoesNotExist:
+                self.transact()
+        else:
+            self.transact()
+
+    @db_transaction.atomic
     def transact(self):
         """
         执行本次交易
@@ -668,23 +711,15 @@ class PlatformTransaction(models.Model):
         """
         transaction_dict = self.generate_transaction_dict()
 
-        # 如果本账户还有更早的交易未发送过，那本次交易也不会发送
-        if PlatformTransaction.objects.filter(account=self.account, hash__isnull=True, nonce__lt=self.nonce).exists():
-            return False
-
         if self.is_transaction_callable(transaction_dict):
-            signed_transaction = self.chain.w3.eth.account.sign_transaction(transaction_dict, self.account.private_key)
-
-            self.hash = signed_transaction.hash.hex()
             self.transacted_at = timezone.now()
             self.save()
 
+            signed_transaction = self.chain.w3.eth.account.sign_transaction(transaction_dict, self.account.private_key)
             self.chain.w3.eth.send_raw_transaction(signed_transaction.rawTransaction)
-            return True
         else:
             self.account.tx_callable_failed_times += 1
             self.account.save()
-            return False
 
     def delete(self, *args, **kwargs):
         raise ValidationError(_("为保护数据完整性，禁止删除."))

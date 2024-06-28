@@ -37,20 +37,20 @@ class CreateWithdrawalSerializer(Serializer):
         return value
 
     def validate_chain(self, value):
-        if not Chain.objects.filter(name=value, active=True).exists():
+        if not Chain.objects.filter(chain_id=value, active=True).exists():
             raise serializers.ValidationError(_(f"网络 {value} 不可用."))
         return value
 
     @staticmethod
     def _is_chain_token_supported(attrs) -> bool:
-        chain = Chain.objects.get(name=attrs["chain"])
+        chain = Chain.objects.get(chain_id=attrs["chain"])
         token = Token.objects.get(symbol=attrs["symbol"])
 
         return token.support_this_chain(chain)
 
     @staticmethod
     def _is_contract_address(attrs) -> bool:
-        chain = Chain.objects.get(name=attrs["chain"])
+        chain = Chain.objects.get(chain_id=attrs["chain"])
 
         if chain.is_contract(attrs["to"]):
             return True
@@ -62,7 +62,7 @@ class CreateWithdrawalSerializer(Serializer):
         project = Project.objects.get(pk=1)
         player, _ = Player.objects.get_or_create(uid=attrs["uid"])
 
-        chain = Chain.objects.get(name=attrs["chain"])
+        chain = Chain.objects.get(chain_id=attrs["chain"])
         token = Token.objects.get(symbol=attrs["symbol"])
 
         value_on_chain = attrs["value"] * 10**token.decimals
@@ -77,11 +77,11 @@ class CreateWithdrawalSerializer(Serializer):
     def validate(self, attrs):
         if not self._is_chain_token_supported(attrs):
             raise serializers.ValidationError(_("网络与代币不匹配."))
-
-        if not self._is_balance_enough(attrs):
-            raise serializers.ValidationError(_("系统账户中的此代币余额不足."))
-
-        if self._is_contract_address(attrs):
-            raise serializers.ValidationError(_("收币地址不可以为合约地址."))
+        #
+        # if not self._is_balance_enough(attrs):
+        #     raise serializers.ValidationError(_(f"系统账户中{attrs['symbol']}余额不足."))
+        #
+        # if self._is_contract_address(attrs):
+        #     raise serializers.ValidationError(_("收币地址不可以为合约地址."))
 
         return attrs

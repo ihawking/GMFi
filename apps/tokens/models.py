@@ -13,7 +13,9 @@ class TokenType(models.TextChoices):
 class Token(models.Model):
     symbol = models.CharField(_("代号"), max_length=8, help_text=_("例如：USDT、UNI"), unique=True)
     decimals = models.PositiveSmallIntegerField(_("精度"), default=18)
-    chains = models.ManyToManyField("chains.Chain", through="tokens.TokenAddress", related_name="tokens")
+    chains = models.ManyToManyField(
+        "chains.Chain", through="tokens.TokenAddress", related_name="tokens", help_text="记录代币在每个公链上的地址，原生代币地址默认为0x0地址"
+    )
 
     coingecko_id = models.CharField(
         max_length=32,
@@ -52,7 +54,7 @@ class TokenAddress(models.Model):
     chain = models.ForeignKey("chains.Chain", on_delete=models.CASCADE, verbose_name=_("公链"))
     address = ChecksumAddressField(_("代币地址"))
 
-    active = models.BooleanField(default=True, verbose_name="启用", help_text="是否启用本代币")
+    active = models.BooleanField(default=True, verbose_name="启用", help_text="关闭将会停止此链上与本代币相关接口的调用")
 
     def __str__(self):
         return f"{self.chain.name} - {self.token.symbol}"

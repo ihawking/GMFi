@@ -5,7 +5,6 @@ from web3 import Web3
 from chains.models import Chain, Account, PlatformTransaction, Block, Transaction
 from common.admin import ReadOnlyModelAdmin, ModelAdmin
 from unfold.decorators import display
-from django.templatetags.static import static
 
 # Register your models here.
 
@@ -20,10 +19,14 @@ class ChainForm(forms.ModelForm):
         instance: Chain = self.instance
         chain_id = Web3(Web3.HTTPProvider(endpoint_uri)).eth.chain_id
 
-        if not instance.chain_id and Chain.objects.filter(pk=chain_id).exists():  # 如果是新建 Chain，需要验证是否与已存在的公链重复
+        if (
+            not instance.chain_id and Chain.objects.filter(pk=chain_id).exists()
+        ):  # 如果是新建 Chain，需要验证是否与已存在的公链重复
             raise forms.ValidationError("公链重复")
 
-        if instance.chain_id and chain_id != instance.chain_id:  # 验证表单中的 uri 指向的 chain id，是否和数据库中的数据匹配
+        if (
+            instance.chain_id and chain_id != instance.chain_id
+        ):  # 验证表单中的 uri 指向的 chain id，是否和数据库中的数据匹配
             raise forms.ValidationError("RPC 地址与当前 Chain ID 不匹配")
         return endpoint_uri
 
@@ -68,17 +71,19 @@ class ChainAdmin(ModelAdmin):
 class BlockAdmin(ReadOnlyModelAdmin):
     list_filter = ("chain",)
     search_fields = ("hash", "number")
-    list_display = ("chain", "number", "hash", "confirmed")
+    list_display = ("id", "chain", "number", "hash", "confirmed")
 
 
 @admin.register(Transaction)
 class TransactionAdmin(ReadOnlyModelAdmin):
+    ordering = ("-id",)
     list_filter = ("block__chain",)
     search_fields = (
         "hash",
         "block__number",
     )
     list_display = (
+        "id",
         "hash",
         "block",
         "type",
@@ -95,3 +100,4 @@ class AccountAdmin(ReadOnlyModelAdmin):
 class PlatformTransactionAdmin(ReadOnlyModelAdmin):
     ordering = ("-created_at",)
     list_display = ("account", "chain", "nonce", "transacted_at", "transaction")
+    search_fields = ("hash", "account__address")

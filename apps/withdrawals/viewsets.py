@@ -21,7 +21,7 @@ class WithdrawalViewSet(viewsets.ModelViewSet):
         validated_data = serializer.validated_data
 
         player, _ = Player.objects.get_or_create(uid=validated_data["uid"])
-        chain = Chain.objects.get(name=validated_data["chain"])
+        chain = Chain.objects.get(chain_id=validated_data["chain"])
         token = Token.objects.get(symbol=validated_data["symbol"])
 
         value = validated_data["value"]

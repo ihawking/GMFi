@@ -58,6 +58,7 @@ class TokenAdmin(ModelAdmin):
 class TokenTransferAdmin(ReadOnlyModelAdmin):
     list_display = (
         "transaction",
+        "token",
         "from_address",
         "to_address",
         "value",

@@ -21,6 +21,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 apps_api = [
+    path("users/", include("users.urls"), name="users"),
     path("invoices/", include("invoices.urls"), name="invoices"),
     path("withdrawals/", include("withdrawals.urls"), name="withdrawals"),
 ]

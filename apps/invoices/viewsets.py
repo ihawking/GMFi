@@ -45,7 +45,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
         project = Project.objects.get(pk=1)
         token = Token.objects.get(symbol=validated_data["token"])
-        chain = Chain.objects.get(name=validated_data["chain"])
+        chain = Chain.objects.get(chain_id=validated_data["chain"])
 
         with db_transaction.atomic():
             salt = os.urandom(32).hex()
@@ -54,7 +54,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             pay_address = create2.predict_address(HexStr(salt), init_code)
 
             invoice = Invoice.objects.create(
-                no=f"G{generate_random_code(length=31)}",
+                no=f"GM{generate_random_code(length=31)}",
                 out_no=validated_data["out_no"],
                 subject=validated_data["subject"],
                 detail=validated_data["detail"],

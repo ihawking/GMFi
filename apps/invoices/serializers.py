@@ -23,13 +23,13 @@ class InvoiceCreateSerializer(Serializer):
         return value
 
     def validate_chain(self, value):
-        if not Chain.objects.filter(name=value, active=True).exists():
+        if not Chain.objects.filter(chain_id=value, active=True).exists():
             raise serializers.ValidationError(_("网络不可用."))
         return value
 
     @staticmethod
     def _is_chain_token_supported(attrs) -> bool:
-        chain = Chain.objects.get(name=attrs["chain"])
+        chain = Chain.objects.get(chain_id=attrs["chain"])
         token = Token.objects.get(symbol=attrs["token"])
 
         return token.support_this_chain(chain)
@@ -67,6 +67,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "token_symbol",
             "token_address",
             "pay_address",
+            "value",
             "pay_url",
             "redirect_url",
         )

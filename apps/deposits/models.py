@@ -28,7 +28,7 @@ class Deposit(PlayerTokenValue):
     def notification_content(self):
         return {
             "action": "deposit",
-            "data": {"uid": self.player.uid, "symbol": self.token.symbol, "value": self.value},
+            "data": {"uid": self.player.uid, "symbol": self.token.symbol, "value": float(self.value)},
         }
 
     class Meta:

@@ -34,6 +34,6 @@ class Notification(models.Model):
             return False
 
     class Meta:
-        ordering = ("created_at",)
+        ordering = ("-created_at",)
         verbose_name = "回调通知"
         verbose_name_plural = verbose_name

@@ -18,7 +18,7 @@ class Manager(AbstractUser):
 class Player(models.Model):
     uid = models.CharField(max_length=64, unique=True, db_index=True, verbose_name=_("玩家UID"))
     deposit_account = models.OneToOneField(
-        "chains.Account", on_delete=models.PROTECT, verbose_name=_("充币地址"), blank=True
+        "chains.Account", on_delete=models.CASCADE, verbose_name=_("充币地址"), blank=True
     )
 
     created_at = models.DateTimeField(auto_now_add=True)

@@ -64,7 +64,9 @@ async def store_block_with_txs(chain: Chain, block_data: AttributeDict) -> Block
     :param chain:
     :return: Block
     """
-    await Block.objects.filter(chain=chain, number__gte=block_data["number"]).adelete()  # 删除同网络中所有比本区块号大的区块
+    await Block.objects.filter(
+        chain=chain, number__gte=block_data["number"]
+    ).adelete()  # 删除同网络中所有比本区块号大的区块
     parent_block = await get_parent_block(chain, block_data["parentHash"].hex())
 
     block_obj: Block = await Block.objects.acreate(
@@ -135,4 +137,7 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Interrupted")

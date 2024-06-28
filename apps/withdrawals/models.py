@@ -14,6 +14,15 @@ class Withdrawal(PlayerTokenValue):
     updated_at = models.DateTimeField(_("更新时间"), auto_now=True)
 
     @property
+    def status(self):
+        if not self.platform_tx.transacted_at:
+            return "待执行"
+        elif self.platform_tx.transaction and self.platform_tx.transaction.block.confirmed:
+            return "已完成"
+        else:
+            return "待确认"
+
+    @property
     def notification_content(self):
         return {
             "action": "withdrawal",
@@ -21,7 +30,7 @@ class Withdrawal(PlayerTokenValue):
                 "no": self.no,
                 "uid": self.player.uid,
                 "symbol": self.token.symbol,
-                "value": self.value,
+                "value": float(self.value),
             },
         }
 

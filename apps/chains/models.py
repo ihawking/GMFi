@@ -3,6 +3,7 @@ import time
 import eth_abi
 from typing import cast
 
+import web3.exceptions
 from django.core.cache import cache
 from django.core.exceptions import ValidationError, PermissionDenied
 from django.db import models
@@ -320,10 +321,6 @@ class Transaction(models.Model):
 
     @db_transaction.atomic
     def confirm(self):
-        try:
-            self.set_token_transfer()
-        except:
-            pass
         if self.success:
             self.notify()
             self.update_account_balance()
@@ -331,7 +328,7 @@ class Transaction(models.Model):
     def link_platform_tx(self):
         try:
             platform_tx = PlatformTransaction.objects.get(
-                chain=self.block.chain, account=self.metadata["from"], nonce=self.metadata["nonce"]
+                chain=self.block.chain, account__address=self.metadata["from"], nonce=self.metadata["nonce"]
             )
             platform_tx.transaction = self
             platform_tx.save()
@@ -644,7 +641,6 @@ class PlatformTransaction(models.Model):
     to = ChecksumAddressField(_("To"))
     value = models.DecimalField(_("Value"), max_digits=36, decimal_places=0, default=0)
     data = models.TextField(_("Data"), blank=True, null=True)
-    gas = models.PositiveIntegerField(_("Gas"), default=160000)
 
     transaction = models.OneToOneField(
         "chains.Transaction", on_delete=models.SET_NULL, verbose_name=_("交易"), null=True, related_name="platform_tx"
@@ -668,7 +664,7 @@ class PlatformTransaction(models.Model):
             "to": self.to,
             "value": int(self.value),
             "data": self.data if self.data else b"",
-            "gas": self.gas,
+            "gas": 160000,
             "gasPrice": self.chain.gas_price * 1,
         }
 
@@ -684,24 +680,10 @@ class PlatformTransaction(models.Model):
             self.chain.w3.eth.call(cast(TxParams, transaction))
         except ValueError:
             return False
+        except web3.exceptions.ContractLogicError:
+            return False
         else:
             return True
-
-    @db_transaction.atomic
-    def check_tx(self):
-        if PlatformTransaction.objects.filter(
-            chain=self.chain, account=self.account, nonce__gt=self.nonce, transaction__isnull=False
-        ).exists():
-            # 如果存在比当前nonce更大的交易完成，说明本次交易已经提交成功，只不过没有入库，所以仅需根据hash查询交易入库就行了
-            try:
-                self.transaction = Transaction.objects.get(
-                    block__chain=self.chain, metadata__from=self.account.address, metadata__nonce=self.nonce
-                )
-                self.save()
-            except Transaction.DoesNotExist:
-                self.transact()
-        else:
-            self.transact()
 
     @db_transaction.atomic
     def transact(self):

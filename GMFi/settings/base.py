@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.join(BASE_DIR, "apps"))
 AUTH_USER_MODEL = "users.Manager"
 
 # Celery Configuration
-CELERY_BROKER_URL = "redis://redis:6379/8"
+CELERY_BROKER_URL = "redis://redis:6379/9"
 CELERY_RESULT_BACKEND = "django-db"
 CELERY_TASK_TIME_LIMIT = 32
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 32

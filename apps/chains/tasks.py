@@ -8,7 +8,6 @@ from common.utils.time import ago
 
 @shared_task(bind=True, max_retries=64, time_limit=64, soft_time_limit=32)
 def filter_and_store_tx(self, block_pk, tx_metadata):
-
     try:
         block = Block.objects.get(pk=block_pk)
         chain = block.chain
@@ -37,7 +36,7 @@ def transact_platform_transactions():
     for platform_tx in PlatformTransaction.objects.filter(
         Q(transacted_at__isnull=True) | Q(transacted_at__lt=ago(minutes=16), transaction__isnull=True)
     ).filter(account__tx_callable_failed_times__lt=32, created_at__lt=ago(seconds=4))[:8]:
-        platform_tx.check_tx()
+        platform_tx.transact()
 
 
 @shared_task(time_limit=64, soft_time_limit=32)

@@ -54,7 +54,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             pay_address = create2.predict_address(HexStr(salt), init_code)
 
             invoice = Invoice.objects.create(
-                no=f"GM{generate_random_code(length=31)}",
+                no=f"GM{generate_random_code(length=16, readable=True)}",
                 out_no=validated_data["out_no"],
                 subject=validated_data["subject"],
                 detail=validated_data["detail"],

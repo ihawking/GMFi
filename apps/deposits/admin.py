@@ -10,3 +10,5 @@ from deposits.models import Deposit
 @admin.register(Deposit)
 class DepositAdmin(ReadOnlyModelAdmin):
     list_display = ("player", "token", "value")
+    search_fields = ("player__uid",)
+    list_filter = ("token",)

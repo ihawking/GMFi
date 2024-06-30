@@ -38,6 +38,6 @@ class WithdrawalAdmin(ReadOnlyModelAdmin):
         return instance.status
 
     def chain(self, obj):
-        return obj.platform_tx.chain.name
+        return obj.transaction_queue.chain.name
 
     chain.short_description = "网络"

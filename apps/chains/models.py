@@ -5,10 +5,10 @@ from typing import cast
 
 import web3.exceptions
 from django.core.cache import cache
-from django.core.exceptions import ValidationError, PermissionDenied
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db import transaction as db_transaction
-from django.db.models import F, Sum, Q
+from django.db.models import F, Sum
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -67,6 +67,10 @@ class Chain(models.Model):
         return f"{self.name}"
 
     @property
+    def is_ready(self):
+        return Block.objects.filter(chain=self).exists()
+
+    @property
     def icon(self):
         return chain_icon_url(self.chain_id)
 
@@ -102,7 +106,7 @@ class Chain(models.Model):
             return True
 
         if Invoice.objects.filter(
-            pay_address=tx["to"], platform_tx__transaction__isnull=True
+            pay_address=tx["to"], transaction_queue__transaction__isnull=True
         ).exists():  # 转入 ETH 到平台内的账单地址，且账单合约未失效
             return True
 
@@ -233,13 +237,19 @@ def chain_fill_up(sender, instance: Chain, **kwargs):
 
 
 class Block(models.Model):
-    hash = HexStr64Field()
-    parent = models.OneToOneField("chains.Block", on_delete=models.CASCADE, blank=True, null=True)
-    chain = models.ForeignKey("chains.Chain", on_delete=models.PROTECT)
-    number = models.PositiveIntegerField(db_index=True)
-    timestamp = models.PositiveIntegerField()
+    hash = HexStr64Field(verbose_name="哈希值")
+    parent = models.OneToOneField(
+        "chains.Block", on_delete=models.CASCADE, blank=True, null=True, verbose_name="父区块"
+    )
+    chain = models.ForeignKey("chains.Chain", on_delete=models.PROTECT, verbose_name="公链")
+    number = models.PositiveIntegerField(db_index=True, verbose_name="区块号")
+    timestamp = models.PositiveIntegerField(verbose_name="时间戳")
 
-    confirmed = models.BooleanField(default=False)
+    confirmed = models.BooleanField(default=False, verbose_name="已确认")
+
+    @property
+    def status(self):
+        return "已确认" if self.confirmed else "待确认"
 
     @property
     def next_number(self):
@@ -249,6 +259,7 @@ class Block(models.Model):
     def confirm_process(self):
         return min(((self.chain.max_block_number - self.number) / self.chain.block_confirmations_count), 1)
 
+    @db_transaction.atomic
     def confirm(self) -> bool:
         if self.confirmed:
             return True
@@ -282,19 +293,19 @@ def block_created(sender, instance, created, **kwargs):
     if created:
         from chains.tasks import confirm_past_blocks
 
-        confirm_past_blocks.delay(instance.pk)
+        confirm_past_blocks.delay(instance.chain.pk)
 
 
 class Transaction(models.Model):
     class Type(models.TextChoices):
-        Paying = "paying", "Paying"
-        Depositing = "depositing", "Depositing"
-        Withdrawal = "withdrawal", "Withdrawal"
+        Paying = "paying", "支付账单"
+        Depositing = "depositing", "玩家充币"
+        Withdrawal = "withdrawal", "玩家提币"
 
-        Funding = "funding", "Funding"
-        GasRecharging = "gas_recharging", "GasRecharging"
-        DepositGathering = "d_gathering", "DepositGathering"
-        InvoiceGathering = "i_gathering", "InvoiceGathering"
+        Funding = "funding", "注入资金"
+        GasRecharging = "gas_recharging", "Gas分发"
+        DepositGathering = "d_gathering", "充币归集"
+        InvoiceGathering = "i_gathering", "账单归集"
 
     block = models.ForeignKey("chains.Block", on_delete=models.CASCADE, related_name="transactions")
     hash = HexStr64Field()
@@ -304,9 +315,8 @@ class Transaction(models.Model):
 
     type = models.CharField(_("类型"), max_length=16, choices=Type.choices, blank=True, null=True)
 
-    @db_transaction.atomic
     def initialize(self):
-        self.link_platform_tx()
+        self.link_transaction_queue()
 
         if self.success:
             self.set_token_transfer()
@@ -325,28 +335,27 @@ class Transaction(models.Model):
             self.notify()
             self.update_account_balance()
 
-    def link_platform_tx(self):
+    def link_transaction_queue(self):
         try:
-            platform_tx = PlatformTransaction.objects.get(
+            transaction_queue = TransactionQueue.objects.get(
                 chain=self.block.chain, account__address=self.metadata["from"], nonce=self.metadata["nonce"]
             )
-            platform_tx.transaction = self
-            platform_tx.save()
+            transaction_queue.transaction = self
+            transaction_queue.save()
 
-        except PlatformTransaction.DoesNotExist:
+        except TransactionQueue.DoesNotExist:
             pass
 
     def get_token_transfer_tuple(self):
         from chains.utils.transactions import TransactionParser
 
-        tx_parser = TransactionParser(self)  # 交易解析器
-        return tx_parser.token_transfer
+        return TransactionParser(self).token_transfer
 
     def set_token_transfer(self):
-        if hasattr(self, "platform_tx") and hasattr(
-            self.platform_tx, "invoice"
+        if hasattr(self, "transaction_queue") and hasattr(
+            self.transaction_queue, "invoice"
         ):  # 部署账单合约，是特殊情况，因为无法通过解析交易得到内部转账信息
-            invoice = self.platform_tx.invoice
+            invoice = self.transaction_queue.invoice
             TokenTransfer.objects.create(
                 transaction=self,
                 token=invoice.token,
@@ -355,20 +364,20 @@ class Transaction(models.Model):
                 value=Payment.objects.filter(invoice=invoice).aggregate(total=Sum("value"))["total"],
             )
         else:
-            token_transfer_tuple = self.get_token_transfer_tuple()
+            transfer = self.get_token_transfer_tuple()
             TokenTransfer.objects.create(
                 transaction=self,
-                token=token_transfer_tuple.token,
-                from_address=token_transfer_tuple.from_address,
-                to_address=token_transfer_tuple.to_address,
-                value=token_transfer_tuple.value,
+                token=transfer.token,
+                from_address=transfer.from_address,
+                to_address=transfer.to_address,
+                value=transfer.value,
             )
 
     def set_type(self):
         token_transfer = self.token_transfer
 
-        if hasattr(self, "platform_tx") and hasattr(
-            self.platform_tx, "invoice"
+        if hasattr(self, "transaction_queue") and hasattr(
+            self.transaction_queue, "invoice"
         ):  # 部署账单合约是特殊情况，因为无法通过解析得到内部转账信息
             _type = Transaction.Type.InvoiceGathering
 
@@ -401,7 +410,7 @@ class Transaction(models.Model):
             pay_address=token_transfer.to_address,
             token=token_transfer.token,
             chain=self.block.chain,
-            platform_tx__transaction__isnull=True,  # 账单如果已经归集了，那任何支付都是无效的
+            transaction_queue__transaction__isnull=True,  # 账单如果已经归集了，那任何支付都是无效的
         ).exists():  # 如果接收代币的是账单地址，代表支付账单的行为
             _type = Transaction.Type.Paying
 
@@ -428,7 +437,7 @@ class Transaction(models.Model):
                     pay_address=token_transfer.to_address,
                     token=token_transfer.token,
                     chain=self.block.chain,
-                    platform_tx__isnull=True,
+                    transaction_queue__isnull=True,
                 )
                 Payment.objects.create(transaction=self, invoice=invoice, value=token_transfer.value)
             except Invoice.DoesNotExist:
@@ -478,7 +487,7 @@ class Transaction(models.Model):
 
     @property
     def withdrawal(self):
-        return self.platform_tx.withdrawal
+        return self.transaction_queue.withdrawal
 
     @property
     def tx_data(self) -> dict:
@@ -494,7 +503,7 @@ class Transaction(models.Model):
     def notify(self, as_pre=False):
         content = {"transaction": self.tx_data}
 
-        if as_pre and content["transaction"]["confirmed"]:  # 如果是预通知，那就只会通知未确认的区块交易
+        if as_pre and content["transaction"]["confirmed"]:  # 如果是预通知，那就只会通知待确认的区块交易
             return
 
         if self.type == Transaction.Type.Paying:
@@ -582,12 +591,10 @@ class Account(models.Model):
         return chain.get_balance(self.address)
 
     def nonce(self, chain: Chain) -> int:
-        return PlatformTransaction.objects.filter(chain=chain, account=self).count()
+        return TransactionQueue.objects.filter(chain=chain, account=self).count()
 
     def send_eth(self, chain: Chain, to: ChecksumAddress, value: int):
-        return PlatformTransaction.objects.create(
-            account=self, chain=chain, to=to, value=value, nonce=self.nonce(chain)
-        )
+        return TransactionQueue.objects.create(account=self, chain=chain, to=to, value=value, nonce=self.nonce(chain))
 
     @staticmethod
     def get_erc20_transfer_data(to: ChecksumAddress, value: int) -> HexStr:
@@ -607,7 +614,7 @@ class Account(models.Model):
 
         token_address = TokenAddress.objects.get(chain=chain, token=token).address
 
-        return PlatformTransaction.objects.create(
+        return TransactionQueue.objects.create(
             account=self,
             chain=chain,
             to=token_address,
@@ -633,7 +640,7 @@ class Account(models.Model):
         verbose_name_plural = _("本地账户")
 
 
-class PlatformTransaction(models.Model):
+class TransactionQueue(models.Model):
     chain = models.ForeignKey("chains.Chain", on_delete=models.DO_NOTHING, verbose_name=_("网络"))
 
     account = models.ForeignKey("chains.Account", on_delete=models.PROTECT, verbose_name=_("账户"))
@@ -643,7 +650,11 @@ class PlatformTransaction(models.Model):
     data = models.TextField(_("Data"), blank=True, null=True)
 
     transaction = models.OneToOneField(
-        "chains.Transaction", on_delete=models.SET_NULL, verbose_name=_("交易"), null=True, related_name="platform_tx"
+        "chains.Transaction",
+        on_delete=models.SET_NULL,
+        verbose_name=_("交易"),
+        null=True,
+        related_name="transaction_queue",
     )
 
     transacted_at = models.DateTimeField(_("交易提交时间"), blank=True, null=True)
@@ -655,6 +666,15 @@ class PlatformTransaction(models.Model):
             return self.transaction.hash
         else:
             return f"{self.chain.name}-{self.account.address}-{self.nonce}"
+
+    @property
+    def status(self):
+        if not self.transacted_at:
+            return "待执行"
+        if self.transacted_at and not self.transaction:
+            return "待上链"
+
+        return self.transaction.block.status
 
     def generate_transaction_dict(self) -> dict:
         transaction = {
@@ -720,5 +740,5 @@ class PlatformTransaction(models.Model):
 
         ordering = ("created_at",)
 
-        verbose_name = _("发送交易")
-        verbose_name_plural = _("发送交易")
+        verbose_name = _("执行队列")
+        verbose_name_plural = verbose_name

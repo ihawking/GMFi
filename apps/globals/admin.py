@@ -20,7 +20,9 @@ class ProjectForm(forms.ModelForm):
     def clean_collection_address(self):
         collection_address = self.cleaned_data.get("collection_address")
 
-        if not w3_auto.is_checksum_address(collection_address):  # 验证表单中的 uri 指向的 chain id，是否和数据库中的数据匹配
+        if not w3_auto.is_checksum_address(
+            collection_address
+        ):  # 验证表单中的 uri 指向的 chain id，是否和数据库中的数据匹配
             raise forms.ValidationError("请输入大小写混合的校验和格式地址")
         return collection_address
 

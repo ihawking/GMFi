@@ -21,7 +21,9 @@ class Project(SingletonModel):
         null=True,
         help_text="只有符合白名单的 IP 才可以与本网关交互；<br/>支持 IP 地址或 IP 网段；<br/>可同时设置多个，中间用英文逗号','分割；<br/>",
     )
-    webhook = models.URLField(_("Webhook回调地址"), max_length=256, null=True, help_text="用于本网关发送通知到项目后端；")
+    webhook = models.URLField(
+        _("Webhook回调地址"), max_length=256, null=True, help_text="用于本网关发送通知到项目后端；"
+    )
     notification_failed_times = models.PositiveIntegerField(
         verbose_name=_("连续通知失败的次数"), default=0, help_text="超过32次则不再发送通知，直到手动置为零；"
     )

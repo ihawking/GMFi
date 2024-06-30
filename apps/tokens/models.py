@@ -14,13 +14,18 @@ class Token(models.Model):
     symbol = models.CharField(_("代号"), max_length=8, help_text=_("例如：USDT、UNI"), unique=True)
     decimals = models.PositiveSmallIntegerField(_("精度"), default=18)
     chains = models.ManyToManyField(
-        "chains.Chain", through="tokens.TokenAddress", related_name="tokens", help_text="记录代币在每个公链上的地址，原生代币地址默认为0x0地址"
+        "chains.Chain",
+        through="tokens.TokenAddress",
+        related_name="tokens",
+        help_text="记录代币在每个公链上的地址，原生代币地址默认为0x0地址",
     )
 
     coingecko_id = models.CharField(
         max_length=32,
         verbose_name="Coingecko API ID",
-        help_text=_("用于自动从Coingecko获取代币USD价格<br/>可以从Coingecko代币详情页面找到此值<br/>如果想手动设置价格，或者代币未上架Coingecko，则留空<br/>"),
+        help_text=_(
+            "用于自动从Coingecko获取代币USD价格<br/>可以从Coingecko代币详情页面找到此值<br/>如果想手动设置价格，或者代币未上架Coingecko，则留空<br/>"
+        ),
         unique=True,
         blank=True,
         null=True,
@@ -54,7 +59,9 @@ class TokenAddress(models.Model):
     chain = models.ForeignKey("chains.Chain", on_delete=models.CASCADE, verbose_name=_("公链"))
     address = ChecksumAddressField(_("代币地址"))
 
-    active = models.BooleanField(default=True, verbose_name="启用", help_text="关闭将会停止此链上与本代币相关接口的调用")
+    active = models.BooleanField(
+        default=True, verbose_name="启用", help_text="关闭将会停止此链上与本代币相关接口的调用"
+    )
 
     def __str__(self):
         return f"{self.chain.name} - {self.token.symbol}"
@@ -75,6 +82,14 @@ class TokenTransfer(models.Model):
     to_address = ChecksumAddressField(_("To"))
     value = models.DecimalField(max_digits=36, decimal_places=0, default=0)
 
+    @property
+    def chain(self):
+        return self.transaction.block.chain
+
+    @property
+    def value_display(self):
+        return f"{self.value / 10**self.token.decimals:.8f}"
+
     class Meta:
         verbose_name = _("转移")
         verbose_name_plural = _("转移")
@@ -94,6 +109,10 @@ class AccountTokenBalance(models.Model):
     chain = models.ForeignKey("chains.Chain", on_delete=models.PROTECT)
     token = models.ForeignKey("tokens.Token", on_delete=models.PROTECT)
     value = models.DecimalField(max_digits=36, decimal_places=0, default=0)
+
+    @property
+    def value_display(self):
+        return f"{self.value / 10**self.token.decimals:.8f}"
 
     class Meta:
         unique_together = (

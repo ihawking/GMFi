@@ -57,11 +57,11 @@ class TokenAdmin(ModelAdmin):
 @admin.register(TokenTransfer)
 class TokenTransferAdmin(ReadOnlyModelAdmin):
     list_display = (
-        "transaction",
+        "chain",
         "token",
         "from_address",
         "to_address",
-        "value",
+        "value_display",
     )
     search_fields = ("transaction__hash",)
 
@@ -72,6 +72,6 @@ class AccountTokenBalanceAdmin(ReadOnlyModelAdmin):
         "account",
         "chain",
         "token",
-        "value",
+        "value_display",
     )
     search_fields = ("account__address",)

@@ -10,5 +10,5 @@ from invoices.models import Invoice
 def gather_invoices():
     now = timezone.now()
 
-    for invoice in Invoice.objects.filter(platform_tx__isnull=True, paid=True, expired_time__lt=now)[:4]:
+    for invoice in Invoice.objects.filter(transaction_queue__isnull=True, paid=True, expired_time__lt=now)[:4]:
         invoice.gather()

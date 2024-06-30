@@ -30,7 +30,7 @@ class WithdrawalViewSet(viewsets.ModelViewSet):
         account.get_lock()
 
         with db_tx.atomic():
-            platform_tx = account.send_token(
+            transaction_queue = account.send_token(
                 chain=chain, token=token, to=validated_data["to"], value=int(value * 10**token.decimals)
             )
             Withdrawal.objects.create(
@@ -39,7 +39,7 @@ class WithdrawalViewSet(viewsets.ModelViewSet):
                 player=player,
                 value=value,
                 token=token,
-                platform_tx=platform_tx,
+                transaction_queue=transaction_queue,
             )
         account.release_lock()
 

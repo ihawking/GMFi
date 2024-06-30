@@ -2,7 +2,7 @@ from django import forms
 from django.contrib import admin
 from web3 import Web3
 
-from chains.models import Chain, Account, PlatformTransaction, Block, Transaction
+from chains.models import Chain, Account, TransactionQueue, Block, Transaction
 from common.admin import ReadOnlyModelAdmin, ModelAdmin
 from unfold.decorators import display
 
@@ -71,23 +71,50 @@ class ChainAdmin(ModelAdmin):
 class BlockAdmin(ReadOnlyModelAdmin):
     list_filter = ("chain",)
     search_fields = ("hash", "number")
-    list_display = ("id", "chain", "number", "hash", "confirmed")
+    list_display = ("chain", "display_number", "hash", "display_status")
+
+    @display(description="区块号", label=True)
+    def display_number(self, instance: Block):
+        return instance.number
+
+    @display(
+        description="状态",
+        label={
+            "已确认": "success",
+            "待确认": "info",
+        },
+    )
+    def display_status(self, instance: Block):
+        return instance.status
 
 
 @admin.register(Transaction)
 class TransactionAdmin(ReadOnlyModelAdmin):
     ordering = ("-id",)
-    list_filter = ("block__chain",)
+    list_filter = (
+        "block__chain",
+        "type",
+    )
     search_fields = (
         "hash",
         "block__number",
     )
     list_display = (
-        "id",
         "hash",
         "block",
         "type",
+        "display_status",
     )
+
+    @display(
+        description="状态",
+        label={
+            "已确认": "success",
+            "待确认": "info",
+        },
+    )
+    def display_status(self, instance: Transaction):
+        return instance.block.status
 
 
 @admin.register(Account)
@@ -96,8 +123,25 @@ class AccountAdmin(ReadOnlyModelAdmin):
     search_fields = ("address",)
 
 
-@admin.register(PlatformTransaction)
-class PlatformTransactionAdmin(ReadOnlyModelAdmin):
+@admin.register(TransactionQueue)
+class TransactionQueueAdmin(ReadOnlyModelAdmin):
     ordering = ("-created_at",)
-    list_display = ("account", "chain", "nonce", "transacted_at", "transaction")
+    list_display = (
+        "account",
+        "chain",
+        "nonce",
+        "display_status",
+    )
     search_fields = ("hash", "account__address")
+
+    @display(
+        description="状态",
+        label={
+            "待执行": "",
+            "待上链": "warning",
+            "待确认": "info",
+            "已确认": "success",
+        },
+    )
+    def display_status(self, instance: TransactionQueue):
+        return instance.status

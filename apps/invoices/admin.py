@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from common.admin import ReadOnlyModelAdmin
 from invoices.models import Invoice, Payment
-
+from unfold.decorators import display
 
 # Register your models here.
 
@@ -16,7 +16,8 @@ class InvoiceAdmin(ReadOnlyModelAdmin):
         "pay_address",
         "value",
         "actual_value",
-        "paid",
+        "created_at",
+        "display_status",
     )
     search_fields = (
         "no",
@@ -26,6 +27,18 @@ class InvoiceAdmin(ReadOnlyModelAdmin):
         "chain",
         "token",
     )
+
+    @display(
+        description="状态",
+        label={
+            "待支付": "warning",
+            "待确认": "info",
+            "已完成": "success",
+            "已失效": "",
+        },
+    )
+    def display_status(self, instance: Invoice):
+        return instance.status
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

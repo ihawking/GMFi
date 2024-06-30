@@ -39,10 +39,8 @@ class TransactionParser:
         receipt = self.chain.w3.eth.get_transaction_receipt(self.metadata["hash"])
         transfer_event = erc20_contract.events.Transfer().process_receipt(receipt)[0]
 
-        chain_token = TokenAddress.objects.get(chain=self.chain, address=transfer_event["address"])
-
         return TokenTransferTuple(
-            chain_token.token,
+            TokenAddress.objects.get(chain=self.chain, address=transfer_event["address"]),
             transfer_event["args"]["from"],
             transfer_event["args"]["to"],
             transfer_event["args"]["value"],

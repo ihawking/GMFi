@@ -11,7 +11,7 @@ from web3.types import HexStr
 
 from chains.utils import create2
 from common.fields import ChecksumAddressField
-
+from django.utils import timezone
 
 # Create your models here.
 
@@ -35,12 +35,25 @@ class Invoice(models.Model):
     paid = models.BooleanField(_("支付完成"), default=False)
     actual_value = models.DecimalField(_("实际支付数量"), max_digits=32, decimal_places=8, default=0)
 
-    platform_tx = models.OneToOneField(
-        "chains.PlatformTransaction", on_delete=models.PROTECT, verbose_name=_("归集交易"), null=True, blank=True
+    transaction_queue = models.OneToOneField(
+        "chains.TransactionQueue", on_delete=models.PROTECT, verbose_name=_("归集交易"), null=True, blank=True
     )
 
     created_at = models.DateTimeField(_("创建时间"), auto_now_add=True)
     updated_at = models.DateTimeField(_("更新时间"), auto_now=True)
+
+    @property
+    def status(self):
+        if not self.paid:
+            if timezone.now() > self.expired_time:
+                return "已失效"
+            else:
+                return "待支付"
+        else:
+            if self.payment_set.filter(transaction__block__confirmed=False).exists():
+                return "待确认"
+            else:
+                return "已完成"
 
     @property
     def notification_content(self):
@@ -67,7 +80,7 @@ class Invoice(models.Model):
 
     @property
     def gathered(self):
-        return self.platform_tx.transaction.block.confirmed
+        return self.transaction_queue.transaction.block.confirmed
 
     @property
     def remaining_value(self) -> Decimal:
@@ -83,13 +96,12 @@ class Invoice(models.Model):
 
         account.get_lock()
         with db_transaction.atomic():
-            from chains.models import PlatformTransaction
+            from chains.models import TransactionQueue
 
-            self.platform_tx = PlatformTransaction.objects.create(
+            self.transaction_queue = TransactionQueue.objects.create(
                 account=account,
                 chain=self.chain,
                 to=create2.factory_address,
-                gas=160000,
                 nonce=account.nonce(self.chain),
                 data=create2.get_transaction_data(
                     salt=cast(HexStr, self.salt), init_code=cast(HexStr, self.init_code)

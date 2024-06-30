@@ -28,7 +28,5 @@ def test_is_transaction_packed(chain):
 
 
 def test_is_transaction_confirmed(chain, latest_transaction_hash):
-    assert chain.is_transaction_confirmed(
-        tx_hash="0xd41400c05944d88a1be002bd625b03056ad273fa3d4d7fd90b1f25e8e2c77c6e"
-    )
+    assert chain.is_transaction_confirmed(tx_hash="0xd41400c05944d88a1be002bd625b03056ad273fa3d4d7fd90b1f25e8e2c77c6e")
     assert not chain.is_transaction_confirmed(tx_hash=latest_transaction_hash)

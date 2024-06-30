@@ -9,6 +9,7 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
+
 import os
 import sys
 from pathlib import Path
@@ -27,7 +28,7 @@ AUTH_USER_MODEL = "users.Manager"
 # Celery Configuration
 CELERY_BROKER_URL = "redis://redis:6379/9"
 CELERY_RESULT_BACKEND = "django-db"
-CELERY_TASK_TIME_LIMIT = 32
+CELERY_TASK_TIME_LIMIT = 128
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 32
 CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True
 CELERY_RESULT_EXTENDED = True
@@ -105,15 +106,6 @@ WSGI_APPLICATION = "GMFi.wsgi.application"
 
 REST_FRAMEWORK = {"DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"]}
 
-# Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -217,13 +209,13 @@ UNFOLD = {
                     },
                     {
                         "title": _("交易"),
-                        "icon": "deployed_code",
+                        "icon": "tag",
                         "link": reverse_lazy("admin:chains_transaction_changelist"),
                     },
                     {
-                        "title": _("发送交易"),
-                        "icon": "deployed_code_history",
-                        "link": reverse_lazy("admin:chains_platformtransaction_changelist"),
+                        "title": _("执行队列"),
+                        "icon": "rebase",
+                        "link": reverse_lazy("admin:chains_transactionqueue_changelist"),
                     },
                 ],
             },

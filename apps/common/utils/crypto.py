@@ -49,9 +49,13 @@ class AESCipher:
         return key
 
 
-def generate_random_code(length=16):
+def generate_random_code(length=16, readable=False):
     # 使用字母和数字的组合
     alphabet = string.ascii_letters + string.digits
+    if readable:
+        confusing_chars = "'0oOq9g2Z'"
+        alphabet = "".join([char for char in alphabet if char not in confusing_chars])
+
     key = "".join(secrets.choice(alphabet) for _ in range(length))
     return key
 

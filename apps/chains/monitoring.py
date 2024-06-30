@@ -114,7 +114,7 @@ async def monitor_the_chain(chain: Chain):
 
                 for new_block_data in new_block_data_list:  # 此处需要保证必须按照从小到大的顺序插入区块
                     await store_block_with_txs(chain, new_block_data)
-                await asyncio.sleep(1)
+                await asyncio.sleep(2)
 
         except:
             await asyncio.sleep(1)

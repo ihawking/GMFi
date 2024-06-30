@@ -68,20 +68,20 @@ class CreateWithdrawalSerializer(Serializer):
         value_on_chain = attrs["value"] * 10**token.decimals
 
         if chain.currency == token:
-            return chain.get_balance(address=project.distribution_address) >= value_on_chain
+            return chain.get_balance(address=project.system_address) >= value_on_chain
         else:
             chain_token = TokenAddress.objects.get(chain=chain, token=token)
             erc20_contract = get_erc20_contract(address=chain_token.address, w3=chain.w3)
-            return erc20_contract.functions.balanceOf(project.distribution_address).call() >= value_on_chain
+            return erc20_contract.functions.balanceOf(project.system_address).call() >= value_on_chain
 
     def validate(self, attrs):
         if not self._is_chain_token_supported(attrs):
             raise serializers.ValidationError(_("网络与代币不匹配."))
-        #
-        # if not self._is_balance_enough(attrs):
-        #     raise serializers.ValidationError(_(f"系统账户中{attrs['symbol']}余额不足."))
-        #
-        # if self._is_contract_address(attrs):
-        #     raise serializers.ValidationError(_("收币地址不可以为合约地址."))
+
+        if not self._is_balance_enough(attrs):
+            raise serializers.ValidationError(_(f"系统账户中{attrs['symbol']}余额不足."))
+
+        if self._is_contract_address(attrs):
+            raise serializers.ValidationError(_("收币地址不可以为合约地址."))
 
         return attrs

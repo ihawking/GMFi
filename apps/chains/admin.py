@@ -81,7 +81,7 @@ class BlockAdmin(ReadOnlyModelAdmin):
         description="状态",
         label={
             "已确认": "success",
-            "待确认": "info",
+            "确认中": "info",
         },
     )
     def display_status(self, instance: Block):
@@ -102,7 +102,7 @@ class TransactionAdmin(ReadOnlyModelAdmin):
     list_display = (
         "hash",
         "block",
-        "type",
+        "display_type",
         "display_status",
     )
 
@@ -110,11 +110,15 @@ class TransactionAdmin(ReadOnlyModelAdmin):
         description="状态",
         label={
             "已确认": "success",
-            "待确认": "info",
+            "确认中": "info",
         },
     )
     def display_status(self, instance: Transaction):
         return instance.block.status
+
+    @display(description="类型", label=False)
+    def display_type(self, instance: Transaction):
+        return instance.get_type_display()
 
 
 @admin.register(Account)
@@ -139,7 +143,7 @@ class TransactionQueueAdmin(ReadOnlyModelAdmin):
         label={
             "待执行": "",
             "待上链": "warning",
-            "待确认": "info",
+            "确认中": "info",
             "已确认": "success",
         },
     )

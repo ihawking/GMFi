@@ -30,7 +30,7 @@ class Project(SingletonModel):
 
     pre_notify = models.BooleanField(_("开启预通知"), default=False)
     hmac_key = models.CharField(_("HMAC密钥"), max_length=256, help_text="用于本网关与项目后端的交互签名；")
-    distribution_account = models.OneToOneField(
+    system_account = models.OneToOneField(
         "chains.Account",
         on_delete=models.PROTECT,
         verbose_name=_("系统账户"),
@@ -40,12 +40,12 @@ class Project(SingletonModel):
     collection_address = ChecksumAddressField(
         null=True,
         verbose_name=_("代币归集地址"),
-        help_text="用户支付的代币，将归集到此地址；",
+        help_text="用户支付和充值的代币，将自动归集到此地址；",
     )
 
     @property
-    def distribution_address(self):
-        return self.distribution_account.address
+    def system_address(self):
+        return self.system_account.address
 
     def __str__(self):
         return "配置"
@@ -61,7 +61,7 @@ def status(request):
     if not all([project.collection_address, project.webhook]):
         return "待设置"
 
-    elif project.distribution_account.tx_callable_failed_times >= 32:
+    elif project.system_account.tx_callable_failed_times >= 32:
         return "系统账户余额不足"
 
     elif project.notification_failed_times > 32:

@@ -43,18 +43,18 @@ class ProjectForm(forms.ModelForm):
 @admin.register(Project)
 class ProjectAdmin(ModelAdmin):
     list_display = (
-        "distribution_account",
+        "system_account",
         "collection_address",
         "webhook",
     )
-    readonly_fields = ("distribution_account",)
+    readonly_fields = ("system_account",)
     form = ProjectForm
     fieldsets = (
         (
             "系统",
             {"fields": ("webhook", "notification_failed_times")},
         ),
-        ("资金", {"fields": ("distribution_account", "collection_address")}),
+        ("资金", {"fields": ("system_account", "collection_address")}),
         ("安全", {"fields": ("ip_white_list", "hmac_key")}),
     )
 

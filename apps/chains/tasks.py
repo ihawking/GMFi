@@ -51,7 +51,7 @@ def confirm_past_blocks(chain_pk):
         chain=latest_block.chain,
         number__lte=max(1, latest_block.number - latest_block.chain.block_confirmations_count),
         confirmed=False,
-    ).order_by("number")[:8]:
+    ).order_by("number")[:32]:
         if block.confirm():
             for tx in Transaction.objects.filter(block=block):
                 tx.confirm()

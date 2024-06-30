@@ -11,7 +11,7 @@ from users.models import Player, Manager
 
 @admin.register(Player)
 class PlayerAdmin(ReadOnlyModelAdmin):
-    list_display = ("uid",)
+    list_display = ("uid", "created_at")
 
 
 @admin.register(Manager)

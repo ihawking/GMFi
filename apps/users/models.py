@@ -21,7 +21,7 @@ class Player(models.Model):
         "chains.Account", on_delete=models.CASCADE, verbose_name=_("充币地址"), blank=True
     )
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="加入时间")
 
     def __str__(self):
         return self.uid

@@ -32,7 +32,7 @@ class InvoiceAdmin(ReadOnlyModelAdmin):
         description="状态",
         label={
             "待支付": "warning",
-            "待确认": "info",
+            "确认中": "info",
             "已完成": "success",
             "已失效": "",
         },

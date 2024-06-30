@@ -40,7 +40,7 @@ class TransactionParser:
         transfer_event = erc20_contract.events.Transfer().process_receipt(receipt)[0]
 
         return TokenTransferTuple(
-            TokenAddress.objects.get(chain=self.chain, address=transfer_event["address"]),
+            TokenAddress.objects.get(chain=self.chain, address=transfer_event["address"]).token,
             transfer_event["args"]["from"],
             transfer_event["args"]["to"],
             transfer_event["args"]["value"],

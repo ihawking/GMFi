@@ -26,7 +26,7 @@ class WithdrawalViewSet(viewsets.ModelViewSet):
 
         value = validated_data["value"]
 
-        account = chain.project.distribution_account
+        account = chain.project.system_account
         account.get_lock()
 
         with db_tx.atomic():

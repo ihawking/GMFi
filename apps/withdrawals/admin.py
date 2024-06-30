@@ -30,7 +30,7 @@ class WithdrawalAdmin(ReadOnlyModelAdmin):
         description="状态",
         label={
             "待执行": "warning",
-            "待确认": "info",
+            "确认中": "info",
             "已完成": "success",
         },
     )

@@ -51,7 +51,7 @@ class Invoice(models.Model):
                 return "待支付"
         else:
             if self.payment_set.filter(transaction__block__confirmed=False).exists():
-                return "待确认"
+                return "确认中"
             else:
                 return "已完成"
 
@@ -92,7 +92,7 @@ class Invoice(models.Model):
         return self.chain.chain_id
 
     def gather(self):
-        account = self.chain.project.distribution_account
+        account = self.chain.project.system_account
 
         account.get_lock()
         with db_transaction.atomic():

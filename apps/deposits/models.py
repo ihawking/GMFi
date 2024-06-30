@@ -13,6 +13,10 @@ class Deposit(PlayerTokenValue):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def status(self):
+        return "已确认" if self.transaction.block.confirmed else "确认中"
+
     @classmethod
     def parse_transaction(cls, transaction: Transaction):
         token_transfer = transaction.token_transfer

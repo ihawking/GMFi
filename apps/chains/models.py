@@ -249,7 +249,7 @@ class Block(models.Model):
 
     @property
     def status(self):
-        return "已确认" if self.confirmed else "待确认"
+        return "已确认" if self.confirmed else "确认中"
 
     @property
     def next_number(self):
@@ -298,14 +298,14 @@ def block_created(sender, instance, created, **kwargs):
 
 class Transaction(models.Model):
     class Type(models.TextChoices):
-        Paying = "paying", "支付账单"
-        Depositing = "depositing", "玩家充币"
-        Withdrawal = "withdrawal", "玩家提币"
+        Paying = "paying", "💳 账单"
+        Depositing = "depositing", "💰 充币"
+        Withdrawal = "withdrawal", "🏧 提币"
 
-        Funding = "funding", "注入资金"
-        GasRecharging = "gas_recharging", "Gas分发"
-        DepositGathering = "d_gathering", "充币归集"
-        InvoiceGathering = "i_gathering", "账单归集"
+        Funding = "funding", "🏦 注入资金"
+        GasRecharging = "gas_recharging", "⛽ Gas分发"
+        DepositGathering = "d_gathering", "📥 充币归集"
+        InvoiceGathering = "i_gathering", "📥 账单归集"
 
     block = models.ForeignKey("chains.Block", on_delete=models.CASCADE, related_name="transactions")
     hash = HexStr64Field()
@@ -382,8 +382,8 @@ class Transaction(models.Model):
             _type = Transaction.Type.InvoiceGathering
 
         elif Project.objects.filter(
-            distribution_account__address=token_transfer.from_address
-        ).exists():  # 项目的代币分发地址往外转币的话只有两种可能 1、Gas 分发 2、提币
+            system_account__address=token_transfer.from_address
+        ).exists():  # 项目的系统账户往外转币的话只有两种可能 1、Gas 分发 2、提币
             if Account.objects.filter(address=token_transfer.to_address).exists():
                 _type = Transaction.Type.GasRecharging
                 Account.objects.get(address=token_transfer.to_address).clear_tx_callable_failed_times()
@@ -401,7 +401,7 @@ class Transaction(models.Model):
             _type = Transaction.Type.DepositGathering
 
         elif Project.objects.filter(
-            distribution_account__address=token_transfer.to_address
+            system_account__address=token_transfer.to_address
         ).exists():  # 系统账户接收代币，代表注入资金到系统账户
             _type = Transaction.Type.Funding
             Account.objects.get(address=token_transfer.to_address).clear_tx_callable_failed_times()
@@ -503,7 +503,7 @@ class Transaction(models.Model):
     def notify(self, as_pre=False):
         content = {"transaction": self.tx_data}
 
-        if as_pre and content["transaction"]["confirmed"]:  # 如果是预通知，那就只会通知待确认的区块交易
+        if as_pre and content["transaction"]["confirmed"]:  # 如果是预通知，那就只会通知确认中的区块交易
             return
 
         if self.type == Transaction.Type.Paying:

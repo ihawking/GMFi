@@ -22,7 +22,7 @@ class Withdrawal(PlayerTokenValue):
         elif self.transaction_queue.transaction and self.transaction_queue.transaction.block.confirmed:
             return "已完成"
         else:
-            return "待确认"
+            return "确认中"
 
     @property
     def notification_content(self):
